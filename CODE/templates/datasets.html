@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pipelines in {{ clicked_path }}</title>
+    <style>
+        /* Add CSS for spacing between buttons */
+        .button-container {
+            margin-top: 10px; /* Adjust as needed */
+        }
+        .button-container button {
+            margin-right: 10px; /* Adjust as needed */
+        }
+    </style>
+    <script>
+      function loadPipeline(clicked_path, pipeline) {
+        // Send an AJAX request to Flask backend
+        console.log('clicked_path:', clicked_path);
+        console.log("***")
+        console.log('pipeline:', pipeline);
+        fetch('/datasets', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ 'path': clicked_path, 'pipeline': pipeline })
+        })
+        .then(response => response.json())
+        .then(data => {
+          // Redirect to the datasets page with the returned data
+          window.location.href = '/datasets/' + encodeURIComponent(clicked_path) + '/' + encodeURIComponent(pipeline);
+        })
+        .catch(error => console.error('Error:', error));
+      }
+    </script>
+</head>
+<body>
+<h1>Pipelines in {{ clicked_path }}</h1>
+<div class="button-container">
+    <h2>Directories:</h2>
+    <ul>
+        {% for pipeline in directories %}
+            <li><button onclick="loadPipeline('{{ clicked_path }}', '{{ pipeline }}')">{{ pipeline }}</button></li>
+        {% endfor %}
+    </ul>
+</div>
+<a href="/">Back to QA Directories</a>
+</body>
+</html>
+
+
+/* Fix the error where it is not bringing us to /datasets/ADNI/PreQual, and is instead bringing us to /datasets/PreQual
+
+Also, make sure when you click on PreQual that it begins the montage.html
+*/

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload and Modify CSV</title>
+</head>
+<body>
+    <h1>Enter the Path to Your CSV File</h1>
+    <form action="/load" method="post">
+        <label for="file_path">File Path:</label>
+        <input type="text" id="file_path" name="file_path" required>
+        <br>
+        <label for="save_path">Save Path:</label>
+        <input type="text" id="save_path" name="save_path" required>
+        <br>
+        <input type="submit" value="Load File">
+    </form>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="flashes">
+        {% for category, message in messages %}
+          <li class="{{ category }}">{{ message }}</li>
+        {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+</body>
+</html>

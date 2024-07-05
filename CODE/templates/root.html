@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QA Directories</title>
+    <style>
+      /* Add CSS for spacing between buttons */
+      .button-container {
+        margin-top: 10px; /* Adjust as needed */
+      }
+      .button-container button {
+        margin-top: 15px; /* Adjust as needed */
+      }
+    </style>
+    <script>
+      function loadDatasets(path) {
+        // Send an AJAX request to Flask backend
+        fetch('/datasets', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ 'path': path })
+        })
+        .then(response => response.json())
+        .then(data => {
+          // Redirect to the datasets page with the returned data
+          window.location.href = '/datasets/' + encodeURIComponent(path);
+        })
+        .catch(error => console.error('Error:', error));
+      }
+    </script>
+  </head>
+  <body>
+    <h1>QA Directories</h1>
+    <div class="button-container">
+      <ul>
+        {% for dataset in datasets %}
+          <li><button onclick="loadDatasets('{{ dataset }}')">{{ dataset }}</button></li>
+        {% endfor %}
+      </ul>
+    </div>
+  </body>
+</html>
