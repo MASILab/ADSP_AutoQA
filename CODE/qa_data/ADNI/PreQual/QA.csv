@@ -1,0 +1,4 @@
+sub,ses,acq,run,QA_status,reason,user,date
+sub-1,ses-1,acq-1,run-2,yes,,Michael,
+sub-1,ses-1,acq-1,run-1,yes,,Michael,
+sub-1,ses-2,acq-1,run-1,yes,,Michael,

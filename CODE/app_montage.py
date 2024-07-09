@@ -4,6 +4,9 @@ import os
 import io
 import argparse
 from pathlib import Path
+import re
+from datetime import datetime
+from tqdm import tqdm
 
 def pa():
     parser = argparse.ArgumentParser(description="""
@@ -34,6 +37,151 @@ assert os.path.exists(QA_directory_abs), "The QA directory path does not exist."
 QA_directory = QA_directory_abs
 
 
+def get_BIDS_fields_from_png(filename):
+    """
+    Given a QA png filename, return the BIDS fields.
+    """
+    #pattern = r"sub-(?P<sub>\d+)_ses-(?P<ses>\d+)_\w+acq-(?P<acq>\d+)run-(?P<run>\d+)\.png"
+    pattern = r'(sub-\w+)(?:_(ses-\w+))?(?:_(\w+))(?:(acq-\w+))?(?:(run-\d{1,2}))?.png'
+    match = re.match(pattern, filename)
+    assert match, f"Filename {filename} does not match the expected pattern."
+    tags = {'sub': match.group(1), 'ses': match.group(2), 'acq': match.group(4), 'run': match.group(5)}
+    return tags
+
+def create_json_dict(filepaths):
+    """
+    Given a list of filenames, create the initial BIDS json dictionary
+    """
+
+    user = os.getlogin()
+    date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    nested_d = {}
+    for png in tqdm(filepaths):
+        current_d = nested_d
+        tags = get_BIDS_fields_from_png(png)
+        sub, ses, acq, run = tags['sub'], tags['ses'], tags['acq'], tags['run']
+        for tag in [sub, ses, acq, run]:
+            if tag:
+                current_d = current_d.setdefault(tag, {})
+        #set the default values
+        row = {'QA_status': 'yes', 'reason': '', 'user': user, 'date': date}
+        current_d.update(row)
+        current_d = nested_d
+
+    return nested_d
+
+    #print(json.dumps(nested_d, indent=4))
+
+def convert_json_to_csv(json_dict):
+    """
+    Given a QA JSON dictionary, convert it to a CSV file
+    """
+
+    def get_tag_type(d):
+        tag_types = {
+            'sub': 'sub',
+            'ses': 'ses',
+            'acq': 'acq',
+            'run': 'run'
+        }
+        for key, value in tag_types.items():
+            if d.startswith(key):
+                return value
+        assert False, f"Unknown tag type: {d}"
+
+    def get_leaf_dicts(d, path=None, curr_dict=None):
+        if path is None:
+            path = []
+        if curr_dict is None:
+            curr_dict = {}
+        leaf_dicts = []
+        for key, value in d.items():
+            #print(key)
+            if isinstance(value, dict):
+                new_path = path + [key]
+                curr_dict[get_tag_type(key)] = key  #### For some reason, curr_dict is carrying over previous values
+                leaf_dicts.extend(get_leaf_dicts(value, new_path, curr_dict))
+            else:
+                leaf_dicts.append((path, d))
+                break
+        return leaf_dicts
+
+    #get the leaf dictionaries
+    leaf_dicts = get_leaf_dicts(json_dict)
+
+    #make sure that the paths are unique and the dictionary has all the information
+    for paths,ds in leaf_dicts:
+        for path in paths:
+            ds[path[:3]] = path
+            assert path in ds.values(), f"Path {path} not in dict {ds}"
+        if 'run' not in ds:
+            ds['run'] = ''
+        if 'acq' not in ds:
+            ds['acq'] = ''
+        if 'ses' not in ds:
+            ds['ses'] = ''
+    #now get a list of only the leaf dictionaries
+    leaf_dicts = [ds for paths,ds in leaf_dicts]
+    #finally, convert to a csv
+    header = ['sub', 'ses', 'acq', 'run', 'QA_status', 'reason', 'user', 'date']
+    df = pd.DataFrame(leaf_dicts)
+    #reorder the columns accroding to the header
+    df = df[header]
+    #replace NaN with empty string
+    df = df.fillna('')
+
+    df.to_csv('qa.csv', index=False)
+
+    return df
+
+def read_csv_to_json(df):
+    """
+    Given a QA CSV dataframe, convert it to a QA JSON dictionary
+    """
+
+    json_data = {}
+
+    for index, row in df.iterrows():
+        #sub, ses, acq, run = row['sub'], row['ses'], row['acq'], row['run']
+        qa_status, reason, user, date = row['QA_status'], row['reason'], row['user'], row['date']
+        current_d = json_data
+        has_d = {}
+        for tag in ['sub', 'ses', 'acq', 'run']:
+            if row[tag]:
+                current_d = current_d.setdefault(row[tag], {})
+                has_d[tag] = row[tag]
+        #set the values
+        add_row = {'QA_status': qa_status, 'reason': reason, 'user': user, 'date': date}
+        if 'run' not in has_d:
+            add_row.update({'run': ''})
+        if 'acq' not in has_d:
+            add_row.update({'acq': ''})
+        if 'ses' not in has_d:
+            add_row.update({'ses': ''})
+        add_row.update(has_d)
+        current_d.update(add_row)
+        current_d = json_data
+    
+    #print(json.dumps(json_data, indent=4))
+
+    return json_data
+
+def compare_dicts(d1, d2):
+    """
+    Compare two dictionaries
+    """
+    
+    #assert len(d1) == len(d2), "Dictionaries have different lengths"
+    for key in d1:
+        #print(key)
+        #print(d1)
+        #print(d2)
+        assert key in d2, f"Key {key} not in d2. d1: {d1} \n d2: {d2}"
+        if isinstance(d1[key], dict):
+            compare_dicts(d1[key], d2[key])
+        else:
+            assert d1[key] == d2[key], f"Values for key {key} are different: {d1[key]} vs {d2[key]}"
+
 @app.route('/')
 def index():
     datasets = [ x for x in Path(QA_directory).glob('*') if x.is_dir() ]
@@ -63,15 +211,40 @@ def datasets(clicked_path):
 
 @app.route('/datasets/<path:clicked_path>/<path:pipeline>')
 def render_montage(clicked_path, pipeline):
+
+    #define the current user (obtained from os)
+    user = os.getlogin()
+
+    #get the current date and time as a string
+    now = datetime.now()
+
     # Get the list of PNG files in the pipeline directory
     pipeline_path = Path(QA_directory + '/' + clicked_path + '/' + pipeline)
     pngs = [str(x.relative_to(QA_directory)) for x in pipeline_path.glob('*.png')]  # Convert paths to relative paths
-    #print("PNGs:", pngs)
-    # Construct URLs to serve these images
-    #image_paths = [url_for('serve_file', filename=str(png)) for png in pngs]
+
+    #pass image paths to montage.html so they can be loaded
     image_paths = [str(png) for png in pngs]
-    #image_names = [str(x.name) for x in pipeline_path.glob('*.png')]
-    print("Image paths:", image_paths)
+    #print("Image paths:", image_paths)
+
+    #check to see if the json file exists. If it doesn't, create it
+    json_path = pipeline_path / 'QA.json'
+    if not json_path.exists():
+        #create the json dictionary
+        json_dict = create_json_dict([ x.split('/')[-1] for x in pngs])
+    
+    #otherwise, read the json file
+    else:
+        #read the json file
+        
+        #check to make sure that every json entry has a corresponding png file (throw an error if not)
+            
+        #if the png does not have a corresponding json entry, it needs to be added
+        
+
+        pass
+
+    #pass the dataframe to montage.html as a json
+    #df_json = df.to_json(orient='records')
 
     return render_template('montage.html', clicked_path=clicked_path, pipeline=pipeline, image_paths=image_paths)
 
