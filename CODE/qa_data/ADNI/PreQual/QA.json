@@ -1,0 +1,42 @@
+{
+    "sub-1": {
+        "ses-1": {
+            "acq-1": {
+                "run-2": {
+                    "QA_status": "yes",
+                    "reason": "",
+                    "user": "Michael",
+                    "date": "2024-07-10 00:09:13",
+                    "sub": "sub-1",
+                    "ses": "ses-1",
+                    "acq": "acq-1",
+                    "run": "run-2"
+                },
+                "run-1": {
+                    "QA_status": "yes",
+                    "reason": "",
+                    "user": "Michael",
+                    "date": "2024-07-10 00:09:13",
+                    "sub": "sub-1",
+                    "ses": "ses-1",
+                    "acq": "acq-1",
+                    "run": "run-1"
+                }
+            }
+        },
+        "ses-2": {
+            "acq-1": {
+                "run-1": {
+                    "QA_status": "yes",
+                    "reason": "",
+                    "user": "Michael",
+                    "date": "2024-07-10 00:09:13",
+                    "sub": "sub-1",
+                    "ses": "ses-2",
+                    "acq": "acq-1",
+                    "run": "run-1"
+                }
+            }
+        }
+    }
+}

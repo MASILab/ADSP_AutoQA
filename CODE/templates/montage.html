@@ -76,6 +76,7 @@
         let currentImageIndex = 0; // Track current image index
         let isLooping = false; // Flag to track if looping is active
         let updateInterval = null; // Interval reference for automatic update
+        let isInputFocused = false; // Flag to track if an input field is focused
 
         // Function to construct the image URL
         function constructImageUrl(clickedPath, pipeline, imageName) {

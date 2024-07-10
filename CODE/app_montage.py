@@ -103,7 +103,7 @@ def get_leaf_dicts(d, path=None, curr_dict=None):
             curr_dict[get_tag_type(key)] = key  #### For some reason, curr_dict is carrying over previous values
             leaf_dicts.extend(get_leaf_dicts(value, new_path, curr_dict))
         else:
-            leaf_dicts.append((path, d))
+            leaf_dicts.append((path, d)) #add the path and the dictionary to the list
             break
     return leaf_dicts
 
@@ -136,9 +136,11 @@ def convert_json_to_csv(json_dict, pipeline_path):
     #replace NaN with empty string
     df = df.fillna('')
 
-    df.to_csv(pipeline_path / 'QA.csv', index=False)
+    df_sorted = df.sort_values(by=['sub', 'ses', 'acq', 'run'])
 
-    return df
+    df_sorted.to_csv(pipeline_path / 'QA.csv', index=False)
+
+    return df_sorted
 
 def read_csv_to_json(df):
     """
@@ -317,9 +319,14 @@ def render_montage(clicked_path, pipeline):
     json_path = pipeline_path / 'QA.json'
     if not json_path.exists():
         #create the json dictionary
+        print("Creating QA json file...")
         json_dict = create_json_dict(pngs_files)
         #convert the json dictionary to a csv
         df = convert_json_to_csv(json_dict, pipeline_path)
+        #the convert_json_to_csv function will alter the json_dict to include the sub, ses, acq, run tags in the leaf dictionaries
+            #so that is why we wait to write the json file until after the csv file is created
+        with open(json_path, 'w') as f:
+            json.dump(json_dict, f, indent=4)
     
     #otherwise, read the json file
     else:
@@ -343,7 +350,27 @@ def render_montage(clicked_path, pipeline):
 
 
     #pass the dataframe to montage.html as a json
-    return render_template('montage.html', clicked_path=clicked_path, pipeline=pipeline, image_paths=image_paths)
+    return render_template('montage.html', clicked_path=clicked_path, pipeline=pipeline, image_paths=image_paths, user=user)
+
+    #need to create the following JS functions:
+        #1.) read in the sub, ses, acq, run tags from the image filename
+            #getBIDSFieldsFromPNG in app_json, also has example code below to access the tags
+        #2.) given the sub, ses, acq, run, be able to get the correspoding QA leaf dictionary from the json
+            #getLeafDict in app_json, also has example code at bottom of script to access leaf dictionary
+        #3.) set up the yes,no,maybe and populate reason based on the corresponding values of the leaf dictionary
+            # ** TODO **
+        #4.) given the sub, ses, acq, run, query the json dictionary to see if the QA status and reason have been updated
+            #4a.) After we change pngs, need to get the values of the current yes,no,maybe and reason
+                # ** TODO **
+        #5.) be able to get the username and datetime of the update
+            #getUserNameAndDateTime in app_json
+                #note the username is passed to the render_template function
+        #6.) push any changes to the json dictionary (should be able to call the update_file app function)
+            # ** TODO **
+
+        #run 1.), 2.), and 3.) at the beginning of the loop (initializeMontage function)
+        #run 4.) when we are changing pngs
+
 
 #may need to create separate ones for PreQual, or others that use PDFs
 
