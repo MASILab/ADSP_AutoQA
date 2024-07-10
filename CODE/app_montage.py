@@ -1,12 +1,10 @@
 from flask import Flask, request, render_template, redirect, url_for, flash, jsonify, send_file
 import pandas as pd
-import os
-import io
-import argparse
+import os, json, io, argparse, re
 from pathlib import Path
-import re
 from datetime import datetime
 from tqdm import tqdm
+import itertools
 
 def pa():
     parser = argparse.ArgumentParser(description="""
@@ -37,7 +35,7 @@ assert os.path.exists(QA_directory_abs), "The QA directory path does not exist."
 QA_directory = QA_directory_abs
 
 
-def get_BIDS_fields_from_png(filename):
+def get_BIDS_fields_from_png(filename, return_pipeline=False):
     """
     Given a QA png filename, return the BIDS fields.
     """
@@ -46,6 +44,8 @@ def get_BIDS_fields_from_png(filename):
     match = re.match(pattern, filename)
     assert match, f"Filename {filename} does not match the expected pattern."
     tags = {'sub': match.group(1), 'ses': match.group(2), 'acq': match.group(4), 'run': match.group(5)}
+    if return_pipeline:
+        tags['pipeline'] = match.group(3)
     return tags
 
 def create_json_dict(filepaths):
@@ -72,39 +72,45 @@ def create_json_dict(filepaths):
 
     #print(json.dumps(nested_d, indent=4))
 
-def convert_json_to_csv(json_dict):
+def get_tag_type(d):
+    """
+    Returns the type of BIDS tag for sub, ses, acq, run. Throws an error if the tag is not one of these.
+    """
+    tag_types = {
+        'sub': 'sub',
+        'ses': 'ses',
+        'acq': 'acq',
+        'run': 'run'
+    }
+    for key, value in tag_types.items():
+        if d.startswith(key):
+            return value
+    assert False, f"Unknown tag type: {d}"
+
+def get_leaf_dicts(d, path=None, curr_dict=None):
+    """
+    Given a nested json dictionary, return a list of the leaf dictionaries
+    """
+    if path is None:
+        path = []
+    if curr_dict is None:
+        curr_dict = {}
+    leaf_dicts = []
+    for key, value in d.items():
+        #print(key)
+        if isinstance(value, dict):
+            new_path = path + [key]
+            curr_dict[get_tag_type(key)] = key  #### For some reason, curr_dict is carrying over previous values
+            leaf_dicts.extend(get_leaf_dicts(value, new_path, curr_dict))
+        else:
+            leaf_dicts.append((path, d))
+            break
+    return leaf_dicts
+
+def convert_json_to_csv(json_dict, pipeline_path):
     """
     Given a QA JSON dictionary, convert it to a CSV file
     """
-
-    def get_tag_type(d):
-        tag_types = {
-            'sub': 'sub',
-            'ses': 'ses',
-            'acq': 'acq',
-            'run': 'run'
-        }
-        for key, value in tag_types.items():
-            if d.startswith(key):
-                return value
-        assert False, f"Unknown tag type: {d}"
-
-    def get_leaf_dicts(d, path=None, curr_dict=None):
-        if path is None:
-            path = []
-        if curr_dict is None:
-            curr_dict = {}
-        leaf_dicts = []
-        for key, value in d.items():
-            #print(key)
-            if isinstance(value, dict):
-                new_path = path + [key]
-                curr_dict[get_tag_type(key)] = key  #### For some reason, curr_dict is carrying over previous values
-                leaf_dicts.extend(get_leaf_dicts(value, new_path, curr_dict))
-            else:
-                leaf_dicts.append((path, d))
-                break
-        return leaf_dicts
 
     #get the leaf dictionaries
     leaf_dicts = get_leaf_dicts(json_dict)
@@ -130,7 +136,7 @@ def convert_json_to_csv(json_dict):
     #replace NaN with empty string
     df = df.fillna('')
 
-    df.to_csv('qa.csv', index=False)
+    df.to_csv(pipeline_path / 'QA.csv', index=False)
 
     return df
 
@@ -182,6 +188,82 @@ def compare_dicts(d1, d2):
         else:
             assert d1[key] == d2[key], f"Values for key {key} are different: {d1[key]} vs {d2[key]}"
 
+def are_unique_qa_dicts(dict_list):
+    """
+    Given a list of qa dictionaries, check that no two dictionaries are the same
+
+    Only considers the sub, ses, acq, and run elements
+    """
+
+    def add_items(curr_set, elt):
+        curr_set.add(elt)
+        return len(curr_set)
+
+    seen = set()
+    for d in tqdm(dict_list):
+        sub, ses, acq, run = d['sub'], d['ses'], d['acq'], d['run']
+        if len(seen) == add_items(seen, (sub, ses, acq, run)):
+            return False
+    return True
+
+def assert_tags_in_dict(paths, leaf_dicts):
+    """
+    For given lists of paths and leaf dictionaries, assert that the paths are in the dictionaries
+    """
+    for paths,ds in zip(paths, leaf_dicts):
+        for path in paths:
+            assert path in ds.values(), f"Path {path} not in dict {ds}"
+
+def check_png_for_json(dicts, pngs):
+    """
+    Given a list of QA json leaf dictionaries and list of pngs, make sure that every single json entry has a corresponding png file
+    """
+
+    #get the pipeline
+    pipeline = get_BIDS_fields_from_png(pngs[0], return_pipeline=True)['pipeline']
+
+    for dic in dicts:
+        sub, ses, acq, run = dic['sub'], dic['ses'], dic['acq'], dic['run']
+        png = f'{sub}_'
+        if ses:
+            png += f"{ses}_"
+        png += f"{pipeline}"
+        if acq:
+            png += f"{acq}"
+        if run:
+            png += f"{run}"
+        png += ".png"
+        assert png in pngs, f"PNG {png} from {dic} not in list of pngs"
+
+def check_json_for_png(nested, pngs):
+    """
+    Given a nested json and list of pngs, make sure that every single png file has a corresponding json entry.
+
+    If it does not, then add the default values to the json file.
+    """
+
+    user = os.getlogin()
+    date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    for png in pngs:
+        tags = get_BIDS_fields_from_png(png)
+        sub, ses, acq, run = tags['sub'], tags['ses'], tags['acq'], tags['run']
+        current_d = nested
+        for tag in [sub, ses, acq, run]:
+            if tag:
+                try:
+                    current_d = current_d[tag]
+                except KeyError:
+                    print(f"PNG {png} has no corresponding json entry. Adding to json file.")
+                    current_d = current_d.setdefault(tag, {})
+        #if current_d is blank, then we need to add the default values
+        if not current_d:
+            row = {'QA_status': 'yes', 'reason': '', 'user': os.getlogin(), 'date': date}
+            current_d.update(row)
+            current_d.update(tags)
+    
+    return nested
+
 @app.route('/')
 def index():
     datasets = [ x for x in Path(QA_directory).glob('*') if x.is_dir() ]
@@ -218,34 +300,49 @@ def render_montage(clicked_path, pipeline):
     #get the current date and time as a string
     now = datetime.now()
 
-    # Get the list of PNG files in the pipeline directory
+    # Get the list of PNG files in the pipeline directory (or pdfs)
     pipeline_path = Path(QA_directory + '/' + clicked_path + '/' + pipeline)
-    pngs = [str(x.relative_to(QA_directory)) for x in pipeline_path.glob('*.png')]  # Convert paths to relative paths
+    pngs = [str(x.relative_to(QA_directory)) for x in itertools.chain(pipeline_path.glob('*.pdf'), pipeline_path.glob('*.png'))]  # Convert paths to relative paths
+
+    ### check to make sure that there are not both pngs and pdfs
+    ext = pngs[0].split('.')[-1]
+    assert all([ x.split('.')[-1] == ext for x in pngs]), "There are both pngs and pdfs in the pipeline directory. Please correct before attempting QA."
 
     #pass image paths to montage.html so they can be loaded
     image_paths = [str(png) for png in pngs]
+    pngs_files = [ x.split('/')[-1] for x in pngs]
     #print("Image paths:", image_paths)
 
     #check to see if the json file exists. If it doesn't, create it
     json_path = pipeline_path / 'QA.json'
     if not json_path.exists():
         #create the json dictionary
-        json_dict = create_json_dict([ x.split('/')[-1] for x in pngs])
+        json_dict = create_json_dict(pngs_files)
+        #convert the json dictionary to a csv
+        df = convert_json_to_csv(json_dict, pipeline_path)
     
     #otherwise, read the json file
     else:
         #read the json file
-        
-        #check to make sure that every json entry has a corresponding png file (throw an error if not)
-            
-        #if the png does not have a corresponding json entry, it needs to be added
-        
+        with open(json_path, 'r') as f:
+            json_dict = json.load(f)
 
-        pass
+        #check to make sure there are no duplicate QA dictionaries
+        paths, leaf_dicts = zip(*get_leaf_dicts(json_dict)) #unzips the tuples into their separate lists
+        assert are_unique_qa_dicts(leaf_dicts), "There are duplicate QA dictionaries in the json file {}. Please correct before attempting QA.".format(json_path)
+
+        #check to make sure that the paths to the json dictionaries are correct
+        assert_tags_in_dict(paths, leaf_dicts)
+
+        #check to make sure that every json entry has a corresponding png file (throw an error if not)
+        pngs_files = [ x.split('/')[-1] for x in pngs]
+        check_png_for_json(leaf_dicts, pngs_files)
+
+        #if the png does not have a corresponding json entry, it needs to be added
+        json_dict = check_json_for_png(json_dict, pngs_files)
+
 
     #pass the dataframe to montage.html as a json
-    #df_json = df.to_json(orient='records')
-
     return render_template('montage.html', clicked_path=clicked_path, pipeline=pipeline, image_paths=image_paths)
 
 #may need to create separate ones for PreQual, or others that use PDFs

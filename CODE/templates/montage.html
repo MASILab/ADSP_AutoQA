@@ -130,7 +130,10 @@
             reasonInput.type = 'text';
             reasonInput.className = 'reason-input';
             reasonInput.placeholder = 'Enter reason for QA status...';
+            reasonInput.addEventListener('focus', () => { isInputFocused = true; });
+            reasonInput.addEventListener('blur', () => { isInputFocused = false; });
             imageContainer.appendChild(reasonInput);
+
 
             imageMontage.appendChild(imageContainer);
 
@@ -190,6 +193,11 @@
 
         // Function to handle keyboard events
         function handleKeyboardEvent(event) {
+
+            if (isInputFocused) {
+                return; // Do nothing if an input field is focused
+            }
+
             switch (event.code) {
                 case 'ArrowLeft':
                     navigateImage(-1); // Move to previous image
