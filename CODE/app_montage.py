@@ -266,6 +266,23 @@ def check_json_for_png(nested, pngs):
     
     return nested
 
+def assert_valid_qa_status(dict_list):
+    """
+    Given a list of QA dictionaries, assert that the QA status is either 'yes', 'no', or 'maybe' for all
+    """
+
+    valid_statuses = ['yes', 'no', 'maybe']
+
+    for d in dict_list:
+        assert d['QA_status'] in valid_statuses, f"QA status {d['QA_status']} is not valid for dictionary {d}"
+
+def save_json_file(path, dict):
+    """
+    Given a json dictionary, save it to the json file
+    """
+    with open(path, 'w') as f:
+        json.dump(dict, f, indent=4)
+
 @app.route('/')
 def index():
     datasets = [ x for x in Path(QA_directory).glob('*') if x.is_dir() ]
@@ -316,6 +333,7 @@ def render_montage(clicked_path, pipeline):
     #print("Image paths:", image_paths)
 
     #check to see if the json file exists. If it doesn't, create it
+    global json_path #initialize the global variable (we will need the path to update the json file later)
     json_path = pipeline_path / 'QA.json'
     if not json_path.exists():
         #create the json dictionary
@@ -325,8 +343,7 @@ def render_montage(clicked_path, pipeline):
         df = convert_json_to_csv(json_dict, pipeline_path)
         #the convert_json_to_csv function will alter the json_dict to include the sub, ses, acq, run tags in the leaf dictionaries
             #so that is why we wait to write the json file until after the csv file is created
-        with open(json_path, 'w') as f:
-            json.dump(json_dict, f, indent=4)
+        save_json_file(json_path, json_dict)
     
     #otherwise, read the json file
     else:
@@ -341,6 +358,9 @@ def render_montage(clicked_path, pipeline):
         #check to make sure that the paths to the json dictionaries are correct
         assert_tags_in_dict(paths, leaf_dicts)
 
+        #check to make sure that the QA status is either 'yes', 'no', or 'maybe'
+        assert_valid_qa_status(leaf_dicts)
+
         #check to make sure that every json entry has a corresponding png file (throw an error if not)
         pngs_files = [ x.split('/')[-1] for x in pngs]
         check_png_for_json(leaf_dicts, pngs_files)
@@ -350,26 +370,32 @@ def render_montage(clicked_path, pipeline):
 
 
     #pass the dataframe to montage.html as a json
-    return render_template('montage.html', clicked_path=clicked_path, pipeline=pipeline, image_paths=image_paths, user=user)
+    return render_template('montage.html', clicked_path=clicked_path, pipeline=pipeline, image_paths=image_paths, user=user, json_dict=json_dict)
+
+    #maybe assert the following python functions:
+
+        #1.) make sure that the 'QA_status' is either 'yes', 'no', or 'maybe' when reading in the json file
+            #done
 
     #need to create the following JS functions:
         #1.) read in the sub, ses, acq, run tags from the image filename
-            #getBIDSFieldsFromPNG in app_json, also has example code below to access the tags
+            #getBIDSFieldsFromPNG in app_json/json_test, also has example code below to access the tags
         #2.) given the sub, ses, acq, run, be able to get the correspoding QA leaf dictionary from the json
+            #2a.) Be able to read in the json dictionary from the data passed to the template
+                #single line at beginning of loop
             #getLeafDict in app_json, also has example code at bottom of script to access leaf dictionary
         #3.) set up the yes,no,maybe and populate reason based on the corresponding values of the leaf dictionary
-            # ** TODO **
+            # Done. Set up in the code body.
         #4.) given the sub, ses, acq, run, query the json dictionary to see if the QA status and reason have been updated
-            #4a.) After we change pngs, need to get the values of the current yes,no,maybe and reason
-                # ** TODO **
+            #4a.) Before we change pngs, need to get the values of the current yes,no,maybe and reason
+                # DONE
         #5.) be able to get the username and datetime of the update
             #getUserNameAndDateTime in app_json
                 #note the username is passed to the render_template function
         #6.) push any changes to the json dictionary (should be able to call the update_file app function)
+            # DONE: also have it saving the csv as well
+        #7.) Make it so that if there is ANY error detected, it freezes the page and displays the error message
             # ** TODO **
-
-        #run 1.), 2.), and 3.) at the beginning of the loop (initializeMontage function)
-        #run 4.) when we are changing pngs
 
 
 #may need to create separate ones for PreQual, or others that use PDFs
@@ -400,59 +426,19 @@ def serve_image(clicked_path, pipeline, image_filename):
 #         # Return a 404 error if the file doesn't exist
 #         return 'Image not found', 404
 
-@app.route('/load', methods=['POST'])
-def load_file():
-    file_path = request.form['file_path']
-    save_path = request.form['save_path']
-    
-    if not os.path.isfile(file_path):
-        return "File not found. Please check the path and try again.", 400
-    
-    df = pd.read_csv(file_path)
-    
-    return render_template('edit3.html', table=df.to_dict(orient='records'), columns=df.columns.tolist(), file_path=file_path, save_path=save_path)
+@app.route('/update_qa_dict', methods=['POST'])
+def update_qa_dict():
+    # Get the JSON data from the request
+    nested_dict = request.json
 
-@app.route('/update', methods=['POST'])
-def update_file():
-    data = request.form
-    save_path = data['save_path']
+    # Push the changes of the json file
+    save_json_file(json_path, nested_dict)
 
-    # Retrieve the form data
-    sub = data['sub']
-    ses = data['ses']
-    acq = data['acq']
-    run = data['run']
-    new_qa_status = data['qa_status']
-    new_reason = data['reason']
+    # also update the csv file
+    _ = convert_json_to_csv(nested_dict, json_path.parent)
 
-    # Load the original CSV
-    df = pd.read_csv(data['file_path'])
-    
-    # Find the row to update
-    row_index = df[(df['sub'] == sub) & (df['ses'] == ses) & (df['acq'] == acq) & (df['run'] == run)].index
-    
-    if not row_index.empty:
-        index = row_index[0]
-        original_qa_status = df.at[index, 'QA_status']
-        original_reason = df.at[index, 'reason']
-
-        # Update the values only if they are different
-        if new_qa_status != original_qa_status or new_reason != original_reason:
-            df.at[index, 'QA_status'] = new_qa_status
-            df.at[index, 'reason'] = new_reason
-            
-            # Ensure the save directory exists
-            os.makedirs(os.path.dirname(save_path), exist_ok=True)
-            
-            # Save the updated CSV
-            df.to_csv(save_path, index=False)
-            flash(f"File successfully saved to {save_path}", 'success')
-        else:
-            flash("No changes detected, nothing was saved.", 'info')
-    else:
-        flash("No matching row found to update.", 'error')
-    
-    return redirect(url_for('index'))
+    # Return a JSON response with the updated dictionary
+    return jsonify({'status': 'success', 'updatedDict': nested_dict})
 
 
 if args.debug:

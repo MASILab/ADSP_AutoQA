@@ -77,6 +77,8 @@
         let isLooping = false; // Flag to track if looping is active
         let updateInterval = null; // Interval reference for automatic update
         let isInputFocused = false; // Flag to track if an input field is focused
+        // save the json dict to a variable
+        const nestedDict = JSON.parse('{{ json_dict | tojson | safe }}');
 
         // Function to construct the image URL
         function constructImageUrl(clickedPath, pipeline, imageName) {
@@ -88,11 +90,14 @@
             const imageMontage = document.getElementById('imageMontage');
             imageMontage.innerHTML = ''; // Clear existing content
 
+             //maybe define this as a global variable, then update it when the user changes the QA status
+            //console.log('json_dict', JSON.parse('{{ json_dict | tojson | safe }}'));
+
             // Create elements for current image
             const imagePath = imagePaths[currentImageIndex];
-            console.log(imagePath);
+            //console.log(imagePath);
             const imageName = imagePath.split('/').pop(); // Get filename from path
-            console.log(imageName);
+            //console.log(imageName);
 
             const imageContainer = document.createElement('div');
             imageContainer.className = 'image-container';
@@ -102,6 +107,14 @@
             /*imagePreview.src = imagePath; // Set image source*/
             // Fetch image path dynamically from Flask endpoint
             /*fetchImage(imagePath, imagePreview);*/
+
+            // get the BIDS fields from the image name (as a dict with keys: sub, ses, acq, run)
+            const bidsFields = getBIDSFieldsFromPNG(imageName, false);
+            //console.log('BIDS Fields:', bidsFields);
+
+            // get the leaf dictionary from the nested dictionary using the BIDS fields
+            const qaDict = getLeafDict(nestedDict, bidsFields);
+            console.log('QA Dictionary:', qaDict);
 
             const imageUrl = constructImageUrl(clickedPath, pipeline, imageName);
             console.log('Fetching image from URL:', imageUrl);
@@ -117,9 +130,11 @@
             const qaButtons = document.createElement('div');
             qaButtons.className = 'qa-buttons';
 
-            const yesButton = createQAButton('Yes', imagePath);
-            const noButton = createQAButton('No', imagePath);
-            const maybeButton = createQAButton('Maybe', imagePath);
+            // Create QA buttons
+            //console.log('QA Status:', qaDict['QA_status']);
+            const yesButton = createQAButton('Yes', qaDict['QA_status'] == 'yes');
+            const noButton = createQAButton('No', qaDict['QA_status'] == 'no');
+            const maybeButton = createQAButton('Maybe', qaDict['QA_status'] == 'maybe');
 
             qaButtons.appendChild(yesButton);
             qaButtons.appendChild(noButton);
@@ -131,6 +146,7 @@
             reasonInput.type = 'text';
             reasonInput.className = 'reason-input';
             reasonInput.placeholder = 'Enter reason for QA status...';
+            reasonInput.value = qaDict['reason'];
             reasonInput.addEventListener('focus', () => { isInputFocused = true; });
             reasonInput.addEventListener('blur', () => { isInputFocused = false; });
             imageContainer.appendChild(reasonInput);
@@ -174,11 +190,11 @@
         }
 
         // Function to create a QA button
-        function createQAButton(status, path) {
+        function createQAButton(status, isActive) {
             const button = document.createElement('button');
             button.className = `qa-button ${status.toLowerCase()}`;
             button.textContent = status;
-            if (status === 'Yes') { /* This would need to be changed to have it read the status in from the csv*/
+            if (isActive) { 
                 button.classList.add('active');
             }
             button.addEventListener('click', function() {
@@ -186,7 +202,7 @@
                 document.querySelectorAll('.qa-button').forEach(btn => {
                     btn.classList.remove('active');
                 });
-                // Highlight button
+                // Highlight button (i.e. set the active status for this button)
                 button.classList.add('active');
             });
             return button;
@@ -216,11 +232,71 @@
 
         // Function to navigate images
         function navigateImage(direction) {
+
+            // check the status of the current QA button and reason compared to the QA dictionary
+                //if they are different, update the dictionary accordingly and push the changes to the server
+            const qaButtons = document.querySelectorAll('.qa-button');
+            const qaStatus = Array.from(qaButtons).find(btn => btn.classList.contains('active')).textContent.toLowerCase();
+            const reasonInput = document.querySelector('.reason-input').value;
+            //console.log('Current QA Status:', qaStatus);
+            //console.log('Current Reason:', reasonInput);
+
+            // get the current values in the json dictionary
+            const imagePath = imagePaths[currentImageIndex];
+            const imageName = imagePath.split('/').pop(); // Get filename from path
+            const bidsFields = getBIDSFieldsFromPNG(imageName, false);
+            const qaDict = getLeafDict(nestedDict, bidsFields);
+
+            // check to see if there is a difference detected. If so update the dictionary and push the changes to the server
+                // perhaps the code can be optimized to only check for a change if a button was pressed or reason box was clicked
+            //console.log('DICT: QA Status:', qaDict['QA_status'], 'Reason:', qaDict['reason']);
+            //console.log('INPUT: QA Status:', qaStatus, 'Reason:', reasonInput);
+            if (qaStatus !== qaDict['QA_status'] || reasonInput !== qaDict['reason']) {
+                console.log('QA Status or Reason has changed. Updating dictionary...');
+                // Update the QA status and reason in the dictionary
+                //console.log(qaDict)
+                qaDict['QA_status'] = qaStatus;
+                qaDict['reason'] = reasonInput;
+                //console.log(qaDict)
+
+                //need to also update the user and the datetime
+                qaDict['user'] = '{{ user }}';
+                qaDict['date'] = getDateTime();
+
+                // Push the updated dictionary to the server
+                fetch('/update_qa_dict', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(nestedDict)
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Updated QA Dictionary:', data);
+                })
+                .catch(error => {
+                    console.error('Error updating QA dictionary:', error);
+                });
+            }
+
             currentImageIndex = (currentImageIndex + direction + imagePaths.length) % imagePaths.length;
+
+            // when navigating to the last image, stop the loop
+            if (currentImageIndex === imagePaths.length - 1) {
+                clearInterval(updateInterval);
+                isLooping = false;
+            }
+
             initializeMontage();
         }
 
-        // Function to toggle looping
+        // Function to toggle looping (maybe include a backwards montage option as well)
         function toggleLoop() {
             isLooping = !isLooping;
             if (isLooping) {
@@ -232,7 +308,76 @@
             }
         }
 
+        // Function to extract BIDS fields from a PNG filename. Returns a dictionary with the BIDS fields
+        function getBIDSFieldsFromPNG(filename, returnPipeline = false) {
+            // Define the regular expression pattern
+            // Note: JavaScript regex does not have named capture groups directly like Python's (?P<name>pattern)
+            // Instead, we use positional capture groups and then access them by index.
+            var pattern = /(sub-\w+)(?:_(ses-\w+))?(?:_(\w+))(?:(acq-\w+))?(?:(run-\d{1,2}))?.png/;
+            var match = filename.match(pattern);
+
+            // Assert that a match is found
+            if (!match) {
+                throw Error(`Filename ${filename} does not match the expected pattern.`);
+            }
+
+            // Extract BIDS fields from the match groups
+            var tags = {
+                sub: match[1],
+                ses: match[2] ? match[2] : undefined,
+                acq: match[4] ? match[4] : undefined,
+                run: match[5] ? match[5] : undefined
+            };
+
+            // Optionally include the pipeline field if specified
+            if (returnPipeline && match[3]) {
+                tags.pipeline = match[3];
+            }
+
+            return tags;
+        }
+
+        // Function to retrieve a leaf dictionary from a nested dictionary given the BIDS tags
+        function getLeafDict(nestedDict, tags) {
+            var leafDict = nestedDict[tags.sub];
+            if (tags.ses !== undefined) {
+                leafDict = leafDict[tags.ses];
+            }
+            if (tags.acq !== undefined) {
+                leafDict = leafDict[tags.acq];
+            }
+            if (tags.run !== undefined) {
+                leafDict = leafDict[tags.run];
+            }
+
+            return leafDict;
+        }
+
+        // get the datetime
+        function getDateTime() {
+            const now = new Date();
+
+            // Format the date and time as "YYYY-MM-DD HH:MM:SS"
+            const formattedDate = now.toLocaleString('en-CA', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            }).replace(',', '');
+
+            return formattedDate;
+            //console.log('Formatted Date and Time:', formattedDate);
+
+            // console.log('Username:', '{{ user }}');
+        }
+
         // Event listener for keyboard events
+            // perhaps may be able to rewrite code so that this can be in the initializeMontage function
+            // as a wrapper for the handleKeyboardEvent function, allowing us to pass additional values like
+            // bidsFields and qaDict (so they don't have to be retreived again in navigateImage)
         document.addEventListener('keydown', handleKeyboardEvent);
 
         // Initialize montage on page load
