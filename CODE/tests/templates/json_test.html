@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Nested Dictionary Display</title>
+</head>
+<body>
+    <h1>Nested Dictionary Contents</h1>
+    <ul id="nestedDict"></ul>
+
+    <script>
+        // Function to render nested dictionary as HTML
+        function renderNestedDict(dict, parentElement) {
+            const ul = document.createElement('ul');
+            for (const key in dict) {
+                if (dict.hasOwnProperty(key)) {
+                    const li = document.createElement('li');
+                    li.textContent = key + ': ';
+
+                    if (typeof dict[key] === 'object' && dict[key] !== null) {
+                        renderNestedDict(dict[key], li); // Recursively render nested dictionaries
+                    } else {
+                        li.textContent += dict[key];
+                    }
+
+                    ul.appendChild(li);
+                }
+            }
+            parentElement.appendChild(ul);
+        }
+
+        function getBIDSFieldsFromPNG(filename, returnPipeline = false) {
+            // Define the regular expression pattern
+            // Note: JavaScript regex does not have named capture groups directly like Python's (?P<name>pattern)
+            // Instead, we use positional capture groups and then access them by index.
+            var pattern = /(sub-\w+)(?:_(ses-\w+))?(?:_(\w+))(?:(acq-\w+))?(?:(run-\d{1,2}))?.png/;
+            var match = filename.match(pattern);
+
+            // Assert that a match is found
+            if (!match) {
+                throw Error(`Filename ${filename} does not match the expected pattern.`);
+            }
+
+            // Extract BIDS fields from the match groups
+            var tags = {
+                sub: match[1],
+                ses: match[2] ? match[2] : undefined,
+                acq: match[4] ? match[4] : undefined,
+                run: match[5] ? match[5] : undefined
+            };
+
+            // Optionally include the pipeline field if specified
+            if (returnPipeline && match[3]) {
+                tags.pipeline = match[3];
+            }
+
+            return tags;
+        }
+
+        // Function to retrieve a leaf dictionary from a nested dictionary given the BIDS tags
+        function getLeafDict(nestedDict, tags) {
+            var leafDict = nestedDict[tags.sub];
+            if (tags.ses !== undefined) {
+                leafDict = leafDict[tags.ses];
+            }
+            if (tags.acq !== undefined) {
+                leafDict = leafDict[tags.acq];
+            }
+            if (tags.run !== undefined) {
+                leafDict = leafDict[tags.run];
+            }
+
+            return leafDict;
+        }
+
+        // get the username and the datetime
+        function getUserNameAndDateTime() {
+            const now = new Date();
+
+            // Format the date and time as "YYYY-MM-DD HH:MM:SS"
+            const formattedDate = now.toLocaleString('en-CA', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            }).replace(',', '');
+
+            console.log('Formatted Date and Time:', formattedDate);
+
+            console.log('Username:', '{{ user }}');
+        }
+
+        // Retrieve the nested dictionary passed from Flask
+        const nestedDict = JSON.parse('{{ data | tojson | safe }}');
+
+        //*** TEST: parse BIDS tags from filename
+        const filename = 'sub-1_ses-1_WMAtlasacq-1run-1.png';
+        const tags = getBIDSFieldsFromPNG(filename, true);
+
+        //print the tags (one by one)
+        for (const key in tags) {
+            console.log(key, tags[key]);
+        }
+
+        // Call the function with the retrieved nestedDict and the parent element to append to
+        const nestedDictElement = document.getElementById('nestedDict');
+        renderNestedDict(nestedDict, nestedDictElement);
+
+        //*** TEST: access the dictionary element from the nested dict using the given tags keys
+        const leafDict = getLeafDict(nestedDict, tags);
+        console.log(leafDict);
+
+        // *** TEST: get the username and the datetime
+        getUserNameAndDateTime();
+
+    </script>
+</body>
+</html>
+
+
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Nested Dictionary Display</title>
+</head>
+<body>
+    <h1>Nested Dictionary Contents</h1>
+    <ul>
+        {% macro render_dict(d) %}
+            <ul>
+                {% for key, value in d.items() %}
+                    <li>{{ key }}: 
+                        {% if value is mapping %}
+                            {{ render_dict(value) }}
+                        {% else %}
+                            {{ value }}
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endmacro %}
+        {{ render_dict(data) }}
+    </ul>
+</body>
+</html> -->

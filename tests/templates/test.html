@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV Manipulator</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <h1>CSV Manipulator</h1>
+    <input type="file" id="csvFileInput" accept=".csv" />
+    <button onclick="saveCSV()">Save CSV</button>
+    <table id="csvTable"></table>
+
+    <script>
+        let csvData = [];
+        let filePath = '';
+
+        document.getElementById('csvFileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                csvData = data.data;
+                filePath = data.file_path;
+                displayCSV(csvData);
+            });
+        });
+
+        function displayCSV(data) {
+            const table = document.getElementById('csvTable');
+            table.innerHTML = '';
+            if (data.length === 0) return;
+
+            const headers = Object.keys(data[0]);
+            const headerRow = document.createElement('tr');
+            headers.forEach(header => {
+                const th = document.createElement('th');
+                th.textContent = header;
+                headerRow.appendChild(th);
+            });
+            table.appendChild(headerRow);
+
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                headers.forEach(header => {
+                    const td = document.createElement('td');
+                    td.textContent = row[header];
+                    td.contentEditable = true;
+                    tr.appendChild(td);
+                });
+                table.appendChild(tr);
+            });
+        }
+
+        function saveCSV() {
+            const table = document.getElementById('csvTable');
+            const headers = [];
+            const updatedData = [];
+
+            for (let i = 0, row; row = table.rows[i]; i++) {
+                const rowData = [];
+                for (let j = 0, col; col = row.cells[j]; j++) {
+                    if (i === 0) {
+                        headers.push(col.textContent);
+                    } else {
+                        rowData.push(col.textContent);
+                    }
+                }
+                if (i !== 0) {
+                    const obj = {};
+                    headers.forEach((header, index) => {
+                        obj[header] = rowData[index];
+                    });
+                    updatedData.push(obj);
+                }
+            }
+
+            fetch('/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ data: updatedData, file_path: filePath })
+            })
+            .then(response => response.text())
+            .then(message => {
+                alert(message);
+            });
+        }
+    </script>
+</body>
+</html>

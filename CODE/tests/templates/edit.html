@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit CSV</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        function extractTableData() {
+            let csv = [];
+            let rows = document.querySelectorAll("table tr");
+            for (let i = 0; i < rows.length; i++) {
+                let row = [], cols = rows[i].querySelectorAll("td, th");
+                for (let j = 0; j < cols.length; j++) 
+                    row.push(cols[j].innerText.trim());
+                csv.push(row.join(","));        
+            }
+            return csv.join("\n");
+        }
+
+        function submitEditedData() {
+            let tableData = extractTableData();
+            let form = document.createElement("form");
+            form.method = "POST";
+            form.action = "/save";
+            
+            let input = document.createElement("input");
+            input.type = "hidden";
+            input.name = "table-data";
+            input.value = tableData;
+            form.appendChild(input);
+
+            let savePath = document.createElement("input");
+            savePath.type = "hidden";
+            savePath.name = "save-path";
+            savePath.value = "{{ save_path }}";
+            form.appendChild(savePath);
+
+            document.body.appendChild(form);
+            form.submit();
+        }
+    </script>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+        td[contenteditable] {
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <h1>Edit CSV</h1>
+    <div>
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    {% for col in columns %}
+                    <th>{{ col }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in table %}
+                <tr>
+                    {% for cell in row %}
+                    <td contenteditable="true">{{ cell }}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <button type="button" onclick="submitEditedData()">Save</button>
+</body>
+</html>

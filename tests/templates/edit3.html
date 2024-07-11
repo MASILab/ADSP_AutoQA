@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit CSV</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+        td[contenteditable] {
+            background-color: #f9f9f9;
+        }
+        .qa-buttons button {
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Edit CSV</h1>
+    <form action="/update" method="post">
+        <input type="hidden" name="file_path" value="{{ file_path }}">
+        <input type="hidden" name="save_path" value="{{ save_path }}">
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    {% for col in columns %}
+                    <th>{{ col }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in table %}
+                <tr>
+                    {% for col, cell in row.items() %}
+                        {% if col in ['QA_status', 'reason'] %}
+                            <td>
+                                {% if col == 'QA_status' %}
+                                    <div class="qa-buttons">
+                                        <button type="button" class="qa-btn" data-value="yes" data-sub="{{ row['sub'] }}" data-ses="{{ row['ses'] }}" data-acq="{{ row['acq'] }}" data-run="{{ row['run'] }}">Yes</button>
+                                        <button type="button" class="qa-btn" data-value="no" data-sub="{{ row['sub'] }}" data-ses="{{ row['ses'] }}" data-acq="{{ row['acq'] }}" data-run="{{ row['run'] }}">No</button>
+                                        <button type="button" class="qa-btn" data-value="maybe" data-sub="{{ row['sub'] }}" data-ses="{{ row['ses'] }}" data-acq="{{ row['acq'] }}" data-run="{{ row['run'] }}">Maybe</button>
+                                    </div>
+                                {% else %}
+                                    <input type="text" name="reason-{{ row['sub'] }}-{{ row['ses'] }}-{{ row['acq'] }}-{{ row['run'] }}" value="{{ cell }}">
+                                {% endif %}
+                            </td>
+                        {% else %}
+                            <td>{{ cell }}</td>
+                        {% endif %}
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <br>
+        <input type="hidden" id="qa_status" name="qa_status" value="">
+        <input type="hidden" id="reason" name="reason" value="">
+        <input type="hidden" id="sub" name="sub" value="">
+        <input type="hidden" id="ses" name="ses" value="">
+        <input type="hidden" id="acq" name="acq" value="">
+        <input type="hidden" id="run" name="run" value="">
+        <button type="submit" id="update-btn">Update</button>
+    </form>
+    <script>
+        $(document).ready(function(){
+            $('.qa-btn').on('click', function() {
+                let value = $(this).data('value');
+                let sub = $(this).data('sub');
+                let ses = $(this).data('ses');
+                let acq = $(this).data('acq');
+                let run = $(this).data('run');
+                $('#qa_status').val(value);
+                $('#sub').val(sub);
+                $('#ses').val(ses);
+                $('#acq').val(acq);
+                $('#run').val(run);
+                $('#reason').val($(`input[name='reason-${sub}-${ses}-${acq}-${run}']`).val());
+            });
+        });
+    </script>
+</body>
+</html>
