@@ -79,10 +79,30 @@
         let isInputFocused = false; // Flag to track if an input field is focused
         // save the json dict to a variable
         const nestedDict = JSON.parse('{{ json_dict | tojson | safe }}');
+        const imageElements = []; // Array to store image elements
 
         // Function to construct the image URL
         function constructImageUrl(clickedPath, pipeline, imageName) {
             return `/datasets/${encodeURIComponent(clickedPath)}/${encodeURIComponent(pipeline)}/${encodeURIComponent(imageName)}`;
+        }
+
+        //function that preloads all images and initializes the montage
+        function preloadImagesAndInitialize() {
+            let loadedCount = 0;
+            
+            // Preload all images
+            imagePaths.forEach((imagePath, index) => {
+                const imageUrl = constructImageUrl(clickedPath, pipeline, imagePath.split('/').pop());
+                const img = new Image();
+                img.onload = () => {
+                    imageElements[index] = img; // Store loaded image element
+                    loadedCount++;
+                    if (loadedCount === imagePaths.length) {
+                        initializeMontage();
+                    }
+                };
+                img.src = imageUrl;
+            });
         }
 
         // Function to initialize the montage
@@ -116,8 +136,9 @@
             const qaDict = getLeafDict(nestedDict, bidsFields);
             console.log('QA Dictionary:', qaDict);
 
-            const imageUrl = constructImageUrl(clickedPath, pipeline, imageName);
-            console.log('Fetching image from URL:', imageUrl);
+            //const imageUrl = constructImageUrl(clickedPath, pipeline, imageName);
+            //console.log('Fetching image from URL:', imageUrl);
+            const imageUrl = imageElements[currentImageIndex].src;
             imagePreview.src = imageUrl;
 
             imageContainer.appendChild(imagePreview);
@@ -381,7 +402,8 @@
         document.addEventListener('keydown', handleKeyboardEvent);
 
         // Initialize montage on page load
-        initializeMontage();
+        preloadImagesAndInitialize();
+        //initializeMontage();
     </script>
 </body>
 </html>
