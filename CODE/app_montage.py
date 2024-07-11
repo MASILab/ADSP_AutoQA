@@ -407,8 +407,13 @@ def render_montage(clicked_path, pipeline):
 
 #may need to create separate ones for PreQual, or others that use PDFs
 
+
 @app.route('/datasets/<path:clicked_path>/<path:pipeline>/<path:image_filename>')
 def serve_image(clicked_path, pipeline, image_filename):
+    """
+    This function is used to load in a single image file (png) from the QA directory
+    """
+
     # Construct the full path to the image file
     image_path = os.path.join(QA_directory, clicked_path, pipeline, image_filename)
 
@@ -435,6 +440,9 @@ def serve_image(clicked_path, pipeline, image_filename):
 
 @app.route('/update_qa_dict', methods=['POST'])
 def update_qa_dict():
+    """
+    This function is called to update the QA JSON and CSV with the new QA status and reason
+    """
     # Get the JSON data from the request
     nested_dict = request.json
 

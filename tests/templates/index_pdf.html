@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Viewer</title>
+    <style>
+        #pdfViewer {
+            width: 100%;
+            height: 100vh;
+            overflow: auto;
+        }
+        canvas {
+            display: block;
+            margin: 10px auto;
+        }
+    </style>
+    <!-- <script type='module' src="{{ url_for('static', filename='js/pdf.js') }}"></script>
+    <script type="module">
+        // Import pdfjsLib and set workerSrc
+        import { pdfjsLib } from "{{ url_for('static', filename='js/pdf.js') }}";
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "{{ url_for('static', filename='js/pdf.worker.js') }}";
+    </script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+</head>
+<body>
+    <div id="pdfViewer"></div>
+
+    <script>
+        async function constructPdfUrl(pdfName) {
+            console.log('PDF Name:', pdfName);
+            // print out the pdf name from the returned Promise object
+            console.log('PDF Name:', pdfName.promise);
+            return `/${encodeURIComponent(pdfName)}`;
+        }
+
+        async function loadPdf(pdfName) {
+            const pdfUrl_task = constructPdfUrl(pdfName);
+            const pdfUrl = await pdfUrl_task.promise;
+            console.log('Fetching PDF from URL:', pdfUrl);
+
+            const pdfViewer = document.getElementById('pdfViewer');
+            pdfViewer.innerHTML = '';
+
+
+
+            const loadingTask = pdfjsLib.getDocument(pdfUrl);
+            const pdf = await loadingTask.promise;
+
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                const page = await pdf.getPage(pageNum);
+                const viewport = page.getViewport({ scale: 1.5 });
+
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: viewport
+                };
+
+                await page.render(renderContext).promise;
+                pdfViewer.appendChild(canvas);
+            }
+        }
+
+        // Example usage
+        const pdfName = '{{ pdf_name }}';
+        loadPdf(pdfName);
+    </script>
+</body>
+</html>
