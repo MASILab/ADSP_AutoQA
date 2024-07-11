@@ -62,11 +62,32 @@
             width: 100%;
             box-sizing: border-box;
         }
+        .loading-bar-container {
+            width: 100%;
+            height: 20px;
+            background-color: #eee;
+            margin-top: 10px;
+            position: relative;
+        }
+        .loading-bar-progress {
+            height: 100%;
+            width: 0%;
+            background-color: #4caf50;
+            position: absolute;
+            top: 0;
+            transition: width 0.3s ease-in-out; /* Smooth transition for width change */
+        }
+        .hidden {
+            display: none; /* Utility class to hide elements */
+        }
     </style>
 </head>
 <body>
     <div id="imageMontage"></div>
     <div id="counter" class="counter">0/0</div>
+    <div class="loading-bar-container">
+        <div id="loadingBar" class="loading-bar-progress"></div>
+    </div>
 
     <script>
         // Extract image paths from template data
@@ -89,6 +110,7 @@
         //function that preloads all images and initializes the montage
         function preloadImagesAndInitialize() {
             let loadedCount = 0;
+            const totalImages = imagePaths.length;
             
             // Preload all images
             imagePaths.forEach((imagePath, index) => {
@@ -97,12 +119,30 @@
                 img.onload = () => {
                     imageElements[index] = img; // Store loaded image element
                     loadedCount++;
+                    updateLoadingBar(loadedCount, totalImages);
                     if (loadedCount === imagePaths.length) {
+                        hideLoadingBar();
                         initializeMontage();
                     }
                 };
                 img.src = imageUrl;
             });
+        }
+
+
+        // Function to update the loading bar
+        function updateLoadingBar(loadedCount, totalImages) {
+            const percentLoaded = (loadedCount / totalImages) * 100;
+            const loadingBar = document.getElementById('loadingBar');
+            loadingBar.style.width = `${percentLoaded}%`;
+        }
+
+        // Function to hide the loading bar
+        function hideLoadingBar() {
+            const loadingBarContainer = document.querySelector('.loading-bar-container');
+            if (loadingBarContainer) {
+                loadingBarContainer.classList.add('hidden');
+            }
         }
 
         // Function to initialize the montage
