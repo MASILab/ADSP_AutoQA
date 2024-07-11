@@ -1,3 +1,10 @@
+"""
+Author: Michael Kim
+Email: michael.kim@vanderbilt.edu
+
+Date: July 11, 2024
+"""
+
 from flask import Flask, request, render_template, redirect, url_for, flash, jsonify, send_file
 import pandas as pd
 import os, json, io, argparse, re

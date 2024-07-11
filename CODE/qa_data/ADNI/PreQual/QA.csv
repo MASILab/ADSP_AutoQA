@@ -1,4 +1,4 @@
 sub,ses,acq,run,QA_status,reason,user,date
 sub-1,ses-1,acq-1,run-1,yes,,Michael,2024-07-10 00:09:13
-sub-1,ses-1,acq-1,run-2,yes,,Michael,2024-07-10 00:09:13
+sub-1,ses-1,acq-1,run-2,yes,looks good,Michael,2024-07-11 00:55:15
 sub-1,ses-2,acq-1,run-1,yes,,Michael,2024-07-10 00:09:13
