@@ -121,7 +121,7 @@ def set_file_permissions(file_path, group_name='p_masi', permissions=0o775):
     """
 
     #set the permissions to be 775
-    os.chmod(file_path, 0o775)
+    os.chmod(file_path, permissions)
     #set the group to be 'p_masi'
     group_name = 'p_masi'
     gid = grp.getgrnam(group_name).gr_gid
@@ -325,7 +325,7 @@ def load_datasets():
 
     # Here you can customize what datasets to show for the selected path
     # For simplicity, I'll assume you fetch directories in a similar manner
-    datasets = [str(x.name) for x in Path(QA_directory + '/' + path).glob('*') if x.is_dir()]
+    datasets = sorted([str(x.name) for x in Path(QA_directory + '/' + path).glob('*') if x.is_dir()])
 
     return jsonify(datasets=datasets)
 
@@ -333,8 +333,8 @@ def load_datasets():
 def datasets(clicked_path):
     if args.debug:
         print("Clicked path:", clicked_path)
-    datasets = [str(x.name) for x in Path(QA_directory + '/' + clicked_path).glob('*') if x.is_dir()]
-    return render_template('datasets.html', clicked_path=clicked_path, directories=datasets)
+    pipelines = sorted([str(x.name) for x in Path(QA_directory + '/' + clicked_path).glob('*') if x.is_dir()], key=lambda x: (x.startswith('Tractseg'), x.upper()))
+    return render_template('datasets.html', clicked_path=clicked_path, directories=pipelines)
 
 @app.route('/datasets/<path:clicked_path>/<path:pipeline>')
 def render_montage(clicked_path, pipeline):
