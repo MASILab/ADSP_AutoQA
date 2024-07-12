@@ -329,6 +329,8 @@ def render_montage(clicked_path, pipeline):
     # Get the list of PNG files in the pipeline directory (or pdfs)
     pipeline_path = Path(QA_directory + '/' + clicked_path + '/' + pipeline)
     pngs = [str(x.relative_to(QA_directory)) for x in itertools.chain(pipeline_path.glob('*.pdf'), pipeline_path.glob('*.png'))]  # Convert paths to relative paths
+    # make the pngs list sorted
+    pngs = sorted(pngs)
 
     ### check to make sure that there are not both pngs and pdfs
     ext = pngs[0].split('.')[-1]
