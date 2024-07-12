@@ -7,7 +7,7 @@ Date: July 11, 2024
 
 from flask import Flask, request, render_template, redirect, url_for, flash, jsonify, send_file
 import pandas as pd
-import os, json, io, argparse, re
+import os, json, io, argparse, re, grp
 from pathlib import Path
 from datetime import datetime
 from tqdm import tqdm
@@ -115,6 +115,18 @@ def get_leaf_dicts(d, path=None, curr_dict=None):
             break
     return leaf_dicts
 
+def set_file_permissions(file_path, group_name='p_masi', permissions=0o775):
+    """
+    sets the file permissions to 775 and the group to 'p_masi'
+    """
+
+    #set the permissions to be 775
+    os.chmod(file_path, 0o775)
+    #set the group to be 'p_masi'
+    group_name = 'p_masi'
+    gid = grp.getgrnam(group_name).gr_gid
+    os.chown(file_path, -1, gid)
+
 def convert_json_to_csv(json_dict, pipeline_path):
     """
     Given a QA JSON dictionary, convert it to a CSV file
@@ -145,8 +157,11 @@ def convert_json_to_csv(json_dict, pipeline_path):
     df = df.fillna('')
 
     df_sorted = df.sort_values(by=['sub', 'ses', 'acq', 'run'])
+    csv_path = pipeline_path / 'QA.csv'
+    df_sorted.to_csv(csv_path, index=False)
 
-    df_sorted.to_csv(pipeline_path / 'QA.csv', index=False)
+    #set the permissions to be 775 and group to p_masi
+    set_file_permissions(csv_path)
 
     return df_sorted
 
@@ -290,6 +305,9 @@ def save_json_file(path, dict):
     """
     with open(path, 'w') as f:
         json.dump(dict, f, indent=4)
+    
+    #set the permissions to be 775 and group to p_masi
+    set_file_permissions(path)
 
 @app.route('/')
 def index():
