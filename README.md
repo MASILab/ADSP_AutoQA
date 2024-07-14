@@ -3,9 +3,12 @@ Automated QA for ADSP processing.
 Written by Michael Kim. 
 Email: michael.kim@vanderbilt.edu
 
+## NOTE:
+The app works best on a smaller monitor, as larger monitors tend to update the screen more slowly.
+
 ## Features to add
 - Template for QA processes such as PreQual that are PDFs instead of singular PNGs. (Work with Nazirah to determine which pages of the PDFs are best for QA and what the format should be)
-- Add in a script for combining all the current QA CSVs into a single, comprehensive CSV for that dataset.
+    - We determined that everything will be a single PNG instead
 - Speed setting: allows you to set the montage speed
 - Reverse montage: allows you to montage in reverse order
 - Blanket error catch: in case any errors occur in HTML, freezes the entire screen with an error message overlaid
