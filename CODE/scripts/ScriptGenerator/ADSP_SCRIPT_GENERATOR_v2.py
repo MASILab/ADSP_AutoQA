@@ -111,8 +111,8 @@ class ScriptGeneratorSetup:
 
         self.generator = None
 
-        if args.pipeline not in self.PIPELINE_MAP.keys():
-            print("Available Pipelines: ", self.PIPELINE_MAP.keys())
+        if args.pipeline not in self.GENERATOR_MAP.keys():
+            print("Available Pipelines: ", self.GENERATOR_MAP.keys())
             raise ValueError("Error: pipeline {} not recognized".format(args.pipeline))
 
         #FS license
