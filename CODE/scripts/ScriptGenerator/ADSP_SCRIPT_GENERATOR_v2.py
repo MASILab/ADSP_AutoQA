@@ -1189,9 +1189,9 @@ class PreQualGenerator(ScriptGenerator):
             script.write("echo {},{},{} > {}\n".format(row['dwi'].name.split('.nii.gz')[0], row['sign'], row['readout'], config_f))
         
         #write all the warnings
-        script.write("echo *** WARNINGS ***\n")
+        script.write("echo '*** WARNINGS ***'\n")
         script.write("echo {}\n".format(self.warnings[self.count]))
-        script.write("echo *** END WARNINGS ***\n")
+        script.write("echo '*** END WARNINGS ***'\n")
 
         #write the PreQual command
         script.write("echo Done writing config file. Now running PreQual...\n")
