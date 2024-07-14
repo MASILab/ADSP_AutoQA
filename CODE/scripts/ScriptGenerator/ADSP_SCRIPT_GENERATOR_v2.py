@@ -62,7 +62,7 @@ def pa():
     p.add_argument('--no_accre', action='store_true', help="If you want to run not on ACCRE, but on a local machine. Will instead output a python file to parallelize the processing.")
     p.add_argument('--custom_atlas_input_dir', type=str, default='', help="For EVE3WMAtlas: custom path to the directory where the atlas inputs are stored")
     p.add_argument('--no_scp', action='store_true', help="If you do not want to scp the outputs to ACCRE (i.e. cp -L instead of scp)")
-    p.add_argument('src_server', type=str, default='landman01.accre.vanderbilt.edu', help="Source server for scp")
+    p.add_argument('--src_server', type=str, default='landman01.accre.vanderbilt.edu', help="Source server for scp")
     return p.parse_args()
 
 class ScriptGeneratorSetup:
