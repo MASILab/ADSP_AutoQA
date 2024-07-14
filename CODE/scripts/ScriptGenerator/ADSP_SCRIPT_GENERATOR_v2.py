@@ -162,6 +162,8 @@ class ScriptGeneratorSetup:
         self.tmp_input_dir = Path(args.tmp_input_dir)
         self.tmp_output_dir = Path(args.tmp_output_dir)
 
+        self.count = None
+
     def check_slurm(self):
         """
         Checks the slurm options to make sure that they are valid and sets up the output.
@@ -277,7 +279,6 @@ class ScriptGeneratorSetup:
 
         #start the script generation
         self.generator = self.GENERATOR_MAP[self.pipeline](self)
-
         print("Wrote {} scripts for {}".format(self.generator.count, self.pipeline))
 
         #output the missing data to a csv file
@@ -318,7 +319,7 @@ class ScriptGeneratorSetup:
             slurm.write("scriptsdir = Path('{}')\n".format(self.script_dir))
             slurm.write("logsdir = Path('{}')\n".format(self.log_dir))
             slurm.write("\n")
-            slurm.write("files = [(str(scriptsdir/('{{}}.sh'.format(x))),str(logsdir/('{{}}.txt'.format(x)))) for x in range(1, int({})+1)]\n".format(self.num_scripts))
+            slurm.write("files = [(str(scriptsdir/('{{}}.sh'.format(x))),str(logsdir/('{{}}.txt'.format(x)))) for x in range(1, int({})+1)]\n".format(self.generator.count))
             slurm.write("\n")
             slurm.write("joblib.Parallel(n_jobs=int({}))(joblib.delayed(run_script)(file) for file in tqdm(files))\n".format(self.slurm_options['num_jobs']))
         print("Finished writing parallelization script.")
@@ -338,7 +339,7 @@ class ScriptGeneratorSetup:
             slurm.write("#SBATCH --nodes={}\n".format(self.slurm_options['num_nodes']))
             slurm.write("#SBATCH --mem={}\n".format(self.slurm_options['memory_per_job']))
             slurm.write("#SBATCH --time={}\n".format(self.slurm_options['time']))
-            slurm.write("#SBATCH --array=1-{}%{}\n".format(self.num_scripts, self.slurm_options['num_jobs']))
+            slurm.write("#SBATCH --array=1-{}%{}\n".format(self.generator.count, self.slurm_options['num_jobs']))
             slurm.write("#SBATCH --output={}/logs_%A_%a.out\n".format(self.log_dir))
             slurm.write("\n")
 
@@ -941,9 +942,9 @@ class ScriptGenerator:
             """
 
             if not self.setup.args.no_scp:
-                script.write("local_md5=$(md5sum {})\nremote_md5=$(ssh {}@{} \"md5sum {}\")\nif [ \"$local_md5\" != \"$remote_md5\" ]; then echo \"PROVENANCE FAIL: Files {} and {} do not match\"; exit 1; else echo Files {} and {} match; fi\n".format(targ_name, self.setup.vunetID, self.setup.args.src_server, input, input, targ_name, input, targ_name))
+                script.write("local_md5=$(md5sum {} | cut -d ' ' -f 1)\nremote_md5=$(ssh {}@{} \"md5sum {} | cut -d ' ' -f 1\")\nif [ \"$local_md5\" != \"$remote_md5\" ]; then echo \"PROVENANCE FAIL: Files {} and {} do not match\"; exit 1; else echo Files {} and {} match; fi\n".format(targ_name, self.setup.vunetID, self.setup.args.src_server, input, input, targ_name, input, targ_name))
             else:
-                script.write("local_md5=$(md5sum {})\nremote_md5=$(md5sum {})\nif [ \"$local_md5\" != \"$remote_md5\" ]; then echo \"PROVENANCE FAIL: Files {} and {} do not match\"; exit 1; else echo Files {} and {} match; fi\n".format(targ_name, input, input, targ_name, input, targ_name))
+                script.write("local_md5=$(md5sum {} | cut -d ' ' -f 1)\nremote_md5=$(md5sum {} | cut -d ' ' -f 1)\nif [ \"$local_md5\" != \"$remote_md5\" ]; then echo \"PROVENANCE FAIL: Files {} and {} do not match\"; exit 1; else echo Files {} and {} match; fi\n".format(targ_name, input, input, targ_name, input, targ_name))
 
         def write_ssh_provenance_check_directory(self, script, input, targ_dir):
             """
@@ -988,7 +989,7 @@ class ScriptGenerator:
                 script.write("MINWAIT=0\n")
                 script.write("MAXWAIT=60\n")
                 script.write("sleep $((MINWAIT+RANDOM % (MAXWAIT-MINWAIT)))\n\n")
-            script.write("Copying inputs to local storage...\n")
+            script.write("echo Copying inputs to local storage...\n")
             #copy over the inputs
             #check the provenance of the inputs right afterwards as well
             input_targets = {}
@@ -1182,10 +1183,10 @@ class PreQualGenerator(ScriptGenerator):
         #write the dtiQA_config.csv file (iterate over the rows of the config dataframe)
         #config_f = self.setup.tmp_input_dir/('dtiQA_config.csv')
         config_f = session_input/('dtiQA_config.csv')
-        with open(config_f, 'w') as config:
-            script.write("echo Writing dtiQA_config.csv\n")
-            for idx, row in self.config[self.count].iterrows():
-                script.write("echo {},{},{} > {}\n".format(row['dwi'].name.split('.nii.gz')[0], row['sign'], row['readout'], config_f))
+        #with open(config_f, 'w') as config:
+        script.write("echo Writing dtiQA_config.csv\n")
+        for idx, row in self.config[self.count].iterrows():
+            script.write("echo {},{},{} > {}\n".format(row['dwi'].name.split('.nii.gz')[0], row['sign'], row['readout'], config_f))
         
         #write all the warnings
         script.write("echo *** WARNINGS ***\n")
@@ -2723,6 +2724,8 @@ def check_needs_synb0(PEaxes, PEsigns, PEunknows):
     #check to see if there are any opposite directions
     if '-' in tmp_signs and '+' in tmp_signs:
         return False
+    
+    return True
     
 
 def get_sub_ses_dwidir(dwi_dir):
