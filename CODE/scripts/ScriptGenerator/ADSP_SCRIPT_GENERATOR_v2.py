@@ -439,77 +439,89 @@ class ScriptGenerator:
 
     ## ABSTRACT CLASSES TO BE IMPLEMENTED BY THE RESPECTIVE CHILD CLASSES ##
         
-    # def freesurfer_script_generate(self):
-    #     """
-    #     Abstract method to be implemented by the child class
-    #     """
-    #     raise NotImplementedError("Error: freesurfer_script_generate not implemented")
+    def freesurfer_script_generate(self):
+        """
+        Abstract method to be implemented by the child class
+        """
+        pass
+        #raise NotImplementedError("Error: freesurfer_script_generate not implemented")
     
-    # def PreQual_script_generate(self):
-    #     """
-    #     Abstract method to be implemented by the child class
-    #     """
-    #     raise NotImplementedError("Error: PreQual_script_generate not implemented")
+    def PreQual_script_generate(self):
+        """
+        Abstract method to be implemented by the child class
+        """
+        pass
+        #raise NotImplementedError("Error: PreQual_script_generate not implemented")
     
-    # def SLANT_TICV_script_generate(self):
-    #     """
-    #     Abstract method to be implemented by the child class
-    #     """
-    #     raise NotImplementedError("Error: SLANT_TICV_script_generate not implemented")
+    def SLANT_TICV_script_generate(self):
+        """
+        Abstract method to be implemented by the child class
+        """
+        pass
+        #raise NotImplementedError("Error: SLANT_TICV_script_generate not implemented")
     
-    # def EVE3Registration_script_generate(self):
-    #     """
-    #     Abstract method to be implemented by the child class
-    #     """
-    #     raise NotImplementedError("Error: EVE3Registration_script_generate not implemented")
+    def EVE3Registration_script_generate(self):
+        """
+        Abstract method to be implemented by the child class
+        """
+        pass
+        #raise NotImplementedError("Error: EVE3Registration_script_generate not implemented")
     
-    # def UNest_script_generate(self):
-    #     """
-    #     Abstract method to be implemented by the child class
-    #     """
-    #     raise NotImplementedError("Error: UNest_script_generate not implemented")
+    def UNest_script_generate(self):
+        """
+        Abstract method to be implemented by the child class
+        """
+        pass
+        #raise NotImplementedError("Error: UNest_script_generate not implemented")
     
-    # def synthstrip_script_generate(self):
-    #     """
-    #     Abstract method to be implemented by the child class
-    #     """
-    #     raise NotImplementedError("Error: synthstrip_script_generate not implemented")
+    def synthstrip_script_generate(self):
+        """
+        Abstract method to be implemented by the child class
+        """
+        pass
+        #raise NotImplementedError("Error: synthstrip_script_generate not implemented")
     
-    # def tractseg_script_generate(self):
-    #     """
-    #     Abstract method to be implemented by the child class
-    #     """
-    #     raise NotImplementedError("Error: tractseg_script_generate not implemented")
+    def tractseg_script_generate(self):
+        """
+        Abstract method to be implemented by the child class
+        """
+        pass
+        #raise NotImplementedError("Error: tractseg_script_generate not implemented")
     
-    # def macruise_script_generate(self):
-    #     """
-    #     Abstract method to be implemented by the child class
-    #     """
-    #     raise NotImplementedError("Error: macruise_script_generate not implemented")
+    def macruise_script_generate(self):
+        """
+        Abstract method to be implemented by the child class
+        """
+        pass
+        #raise NotImplementedError("Error: macruise_script_generate not implemented")
     
-    # def connectome_special_script_generate(self):
-    #     """
-    #     Abstract method to be implemented by the child class
-    #     """
-    #     raise NotImplementedError("Error: connectome_special_script_generate not implemented")
+    def connectome_special_script_generate(self):
+        """
+        Abstract method to be implemented by the child class
+        """
+        pass
+        #raise NotImplementedError("Error: connectome_special_script_generate not implemented")
     
-    # def francois_special_script_generate(self):
-    #     """
-    #     Abstract method to be implemented by the child class
-    #     """
-    #     raise NotImplementedError("Error: francois_special_script_generate not implemented")
+    def francois_special_script_generate(self):
+        """
+        Abstract method to be implemented by the child class
+        """
+        pass
+        #raise NotImplementedError("Error: francois_special_script_generate not implemented")
     
-    # def biscuit_script_generate(self):
-    #     """
-    #     Abstract method to be implemented by the child class
-    #     """
-    #     raise NotImplementedError("Error: biscuit_script_generate not implemented")
+    def biscuit_script_generate(self):
+        """
+        Abstract method to be implemented by the child class
+        """
+        pass
+        #raise NotImplementedError("Error: biscuit_script_generate not implemented")
     
-    # def noddi_script_generate(self):
-    #     """
-    #     Abstract method to be implemented by the child class
-    #     """
-    #     raise NotImplementedError("Error: noddi_script_generate not implemented")
+    def noddi_script_generate(self):
+        """
+        Abstract method to be implemented by the child class
+        """
+        pass
+        #raise NotImplementedError("Error: noddi_script_generate not implemented")
     
     ## END ABSTRACT CLASSES ##
 
