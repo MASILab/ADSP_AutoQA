@@ -384,6 +384,13 @@ class ScriptGenerator:
         pass
         #raise NotImplementedError("Error: EVE3Registration_script_generate not implemented")
     
+    def MNI152Registration_script_generate(self):
+        """
+        Abstract method to be implemented by the child class
+        """
+        pass
+        #raise NotImplementedError("Error: MNI152Registration_script_generate not implemented")
+
     def UNest_script_generate(self):
         """
         Abstract method to be implemented by the child class
