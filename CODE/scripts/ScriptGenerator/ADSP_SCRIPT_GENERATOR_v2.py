@@ -63,6 +63,7 @@ def pa():
     p.add_argument('--custom_atlas_input_dir', type=str, default='', help="For EVE3WMAtlas: custom path to the directory where the atlas inputs are stored")
     p.add_argument('--no_scp', action='store_true', help="If you do not want to scp the outputs to ACCRE (i.e. cp -L instead of scp)")
     p.add_argument('--src_server', type=str, default='landman01.accre.vanderbilt.edu', help="Source server for scp")
+    p.add_argument('--separate_prequal', action='store_true', help="If you want to run all DWI separately through PreQual, regardless of whether the can be run together")
     return p.parse_args()
 
 class ScriptGeneratorSetup:
@@ -856,13 +857,13 @@ class ScriptGenerator:
         tmp_input_dir = kwargs['tmp_input_dir']/(sub)/("{}{}{}".format(ses,acq,run))
         tmp_output_dir = kwargs['tmp_output_dir']/(sub)/("{}{}{}".format(ses,acq,run))
         tmp_dirs = [tmp_input_dir, tmp_output_dir]
-        if kwargs['has_working']:
+        if 'has_working' in kwargs.keys() and kwargs['has_working']:
             working_dir = kwargs['working_dir']/(sub)/("{}{}{}".format(ses,acq,run))
             tmp_dirs.append(working_dir)
-        if kwargs['has_temp']:
+        if 'has_temp' in kwargs.keys() and kwargs['has_temp']:
             temp_dir = kwargs['temp_dir']/(sub)/("{}{}{}".format(ses,acq,run))
             tmp_dirs.append(temp_dir)
-        if kwargs['ticv']:
+        if 'ticv' in kwargs.keys() and kwargs['ticv']:
             post = tmp_output_dir/"post"
             pre = tmp_output_dir/"pre"
             dl = tmp_output_dir/"dl"
@@ -912,22 +913,22 @@ class ScriptGenerator:
             else:
                 script.write("cp -rL {} {}\n".format(input, targ_name))
 
-        def write_copy_from_output_line(self, script, session_output, deriv_output_dir, **kwargs):
+        def write_copy_from_output_line(self, script, session_output, deriv_output, **kwargs):
             """
             Writes the line(s) to copy the output from the session output dir back to the storage space
             """
             if not 'special_copy' in kwargs:
                 if not self.setup.args.no_scp:
-                    script.write("scp -r {}/* {}@{}:{}/\n".format(session_output, self.setup.vunetID, self.setup.args.src_server, deriv_output_dir))
+                    script.write("scp -r {}/* {}@{}:{}/\n".format(session_output, self.setup.vunetID, self.setup.args.src_server, deriv_output))
                 else:
-                    script.write("cp -r {}/* {}/\n".format(session_output, deriv_output_dir))
+                    script.write("cp -r {}/* {}/\n".format(session_output, deriv_output))
             else:
                 #do not just copy back all outputs, but only the necessary ones
                 for targ_copy in kwargs['special_copy']:
                     if not self.setup.args.no_scp:
-                        script.write("scp -r {}/* {}@{}:{}/\n".format(session_output/targ_copy, self.setup.vunetID, self.setup.args.src_server, deriv_output_dir))
+                        script.write("scp -r {}/* {}@{}:{}/\n".format(session_output/targ_copy, self.setup.vunetID, self.setup.args.src_server, deriv_output))
                     else:
-                        script.write("cp -r {}/* {}/\n".format(session_output/targ_copy, deriv_output_dir))
+                        script.write("cp -r {}/* {}/\n".format(session_output/targ_copy, deriv_output))
 
         def write_ssh_provenance_check(self, script, input, targ_name):
             """
@@ -940,9 +941,9 @@ class ScriptGenerator:
             """
 
             if not self.setup.args.no_scp:
-                script.write("local_md5=$(md5sum {})\nremote_md5=$(ssh {}@{} \"md5sum {}\")\nif [ \"$local_md5\" != \"$remote_md5\" ]; then echo \"PROVENANCE FAIL: Files {} and {} do not match\"; exit 1; else echo Files {} and {} match; fi".format(targ_name, self.setup.vunetID, self.setup.args.src_server, input, input, targ_name, input, targ_name))
+                script.write("local_md5=$(md5sum {})\nremote_md5=$(ssh {}@{} \"md5sum {}\")\nif [ \"$local_md5\" != \"$remote_md5\" ]; then echo \"PROVENANCE FAIL: Files {} and {} do not match\"; exit 1; else echo Files {} and {} match; fi\n".format(targ_name, self.setup.vunetID, self.setup.args.src_server, input, input, targ_name, input, targ_name))
             else:
-                script.write("local_md5=$(md5sum {})\nremote_md5=$(md5sum {})\nif [ \"$local_md5\" != \"$remote_md5\" ]; then echo \"PROVENANCE FAIL: Files {} and {} do not match\"; exit 1; else echo Files {} and {} match; fi".format(targ_name, input, input, targ_name, input, targ_name))
+                script.write("local_md5=$(md5sum {})\nremote_md5=$(md5sum {})\nif [ \"$local_md5\" != \"$remote_md5\" ]; then echo \"PROVENANCE FAIL: Files {} and {} do not match\"; exit 1; else echo Files {} and {} match; fi\n".format(targ_name, input, input, targ_name, input, targ_name))
 
         def write_ssh_provenance_check_directory(self, script, input, targ_dir):
             """
@@ -960,6 +961,7 @@ class ScriptGenerator:
             if not self.setup.args.no_scp: #another /* here?
                 content="src_dir={output_dir}; declare -A targ_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\";key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); targ_dict[\"$key\"]=\"$value\"; done < <(ssh {ID}@{server} \"find ${{src_dir}} -type f -exec md5sum {{}} +\")\n".format(ID=self.setup.vunetID, server=self.setup.args.src_server, output_dir=targ_dir)
                 #script.write('declare -A targ_dict && while read -r value key; do targ_dict[${{key}}]=$value; done <<< "$(ssh {}@{} \"md5sum {}\")"'.format(self.setup.vunetID, self.setup.args.src_server, targ_dir))
+                script.write(content)
             else:
                 content="src_dir={output_dir}; declare -A targ_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\"; key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); targ_dict[\"$key\"]=\"$value\"; done < <(find $src_dir -type f -exec md5sum {{}} +)\n".format(output_dir=targ_dir)
                 script.write(content)
@@ -973,7 +975,7 @@ class ScriptGenerator:
             ## TODO: if the provenance fails, then make sure to remove the files in the outputs directory (and temp directories)
                 #maybe also remove the copied outputs over ssh
 
-        script_f = self.script_dir/("{}.sh".format(self.count))
+        script_f = self.setup.script_dir/("{}.sh".format(self.count))
         with open(script_f, 'w') as script:
             #write the header
             script.write("#!/bin/bash\n")
@@ -986,11 +988,11 @@ class ScriptGenerator:
                 script.write("MINWAIT=0\n")
                 script.write("MAXWAIT=60\n")
                 script.write("sleep $((MINWAIT+RANDOM % (MAXWAIT-MINWAIT)))\n\n")
-            script.write("Copying inputs to local storage...")
+            script.write("Copying inputs to local storage...\n")
             #copy over the inputs
             #check the provenance of the inputs right afterwards as well
             input_targets = {}
-            for key,input in self.inputs_dict[self.count].item(): ### THIS NEEDS TO BE FIXED
+            for key,input in self.inputs_dict[self.count].items(): ### THIS NEEDS TO BE FIXED
                 if type(input) == list:
                     input_targets[key] = {}
                     for i in input:
@@ -1015,7 +1017,7 @@ class ScriptGenerator:
                     write_copy_to_input_line(self, script, input, targ_file)
                     write_ssh_provenance_check(self, script, input, targ_file)
             #now that all the inputs are copied, write the specifics for running the pipeline
-            script.write("All inputs copied successfully. Running {}\n".format(self.setup.args.pipeline))
+            #script.write("echo All inputs copied successfully. Running {}\n".format(self.setup.args.pipeline))
 
             #write the specifics for the pipeline
             tmp_input_targ_dict = {'input_targets': input_targets}
@@ -1086,23 +1088,30 @@ class ScriptGenerator:
     def write_config_yml_lines(self, script, session_output, deriv_output):
         """
         Writes the lines to a script that output a config yaml file, then the line that copies it back to the output directory
-
-        TODO:
-        May want to include the creation of checksums for the file outputs?
         """
+
+        def convert_dict_paths_to_string(data):
+            if isinstance(data, dict):
+                for key, value in data.items():
+                    if isinstance(value, dict):
+                        data[key] = convert_dict_paths_to_string(value)
+                    elif isinstance(value, Path):
+                        data[key] = str(value)
+            return data
 
         config_yml_name = "pipeline_config.yml"
 
         config_yml = {
-            'inputs': self.inputs_dict[self.count],
+            'inputs': convert_dict_paths_to_string(self.inputs_dict[self.count]),
             'key_outputs': [str(deriv_output/x) for x in self.necessary_outputs[self.setup.args.pipeline]],
             'user': self.setup.vunetID,
             'date_of_script_generation': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            'simg path': self.setup.simg
+            'simg path': str(self.setup.simg)
         }
 
         if self.setup.args.pipeline == 'PreQual':
-            config_yml['config'] = self.config[self.count].to_dict(orient='records')
+            #print(convert_dict_paths_to_string(self.config[self.count].to_dict(orient='records')))
+            config_yml['config'] = convert_dict_paths_to_string(self.config[self.count].to_dict(orient='records')[0])
             config_yml['warnings'] = self.warnings[self.count]
 
         #with open(deriv_output/'config.yml', 'w') as yml:
@@ -1140,6 +1149,8 @@ class PreQualGenerator(ScriptGenerator):
 
         self.config = {}
         self.warnings = {}
+        self.inputs_dict = {}
+        self.outputs = {}
 
         self.generate_prequal_scripts()
 
@@ -1159,21 +1170,22 @@ class PreQualGenerator(ScriptGenerator):
         #setup the options for PreQual
         PEaxis = kwargs['PEaxis']
         opts = ''
-        if self.args.dataset_name == "HCPA" or self.args.dataset_name == "HCPD" or self.args.dataset_name == "HCP":
+        if self.setup.args.dataset_name == "HCPA" or self.setup.args.dataset_name == "HCPD" or self.setup.args.dataset_name == "HCP":
             #we want to turn off all PREPROCESSING steps possible
             opts = '--denoise off'
-        elif self.args.dataset_name == "OASIS3":
+        elif self.setup.args.dataset_name == "OASIS3":
             #we need the threshold for bvalues (as this is the weird bvalue acquisition)
             opts = '--bval_threshold 51 --eddy_bval_scale 2 --topup_first_b0s_only'
         else:
             opts = '--topup_first_b0s_only'
 
         #write the dtiQA_config.csv file (iterate over the rows of the config dataframe)
-        config_f = self.setup.tmp_input_dir/('dtiQA_config.csv')
+        #config_f = self.setup.tmp_input_dir/('dtiQA_config.csv')
+        config_f = session_input/('dtiQA_config.csv')
         with open(config_f, 'w') as config:
             script.write("echo Writing dtiQA_config.csv\n")
             for idx, row in self.config[self.count].iterrows():
-                script.write("echo {},{},{} > {}\n".format(row['dwi'], row['sign'], row['readout'], config_f))
+                script.write("echo {},{},{} > {}\n".format(row['dwi'].name.split('.nii.gz')[0], row['sign'], row['readout'], config_f))
         
         #write all the warnings
         script.write("echo *** WARNINGS ***\n")
@@ -1213,7 +1225,7 @@ class PreQualGenerator(ScriptGenerator):
 
         dwi_dirs = self.get_dwi_dirs()
 
-        for dwi_dir_p in dwi_dirs:
+        for dwi_dir_p in tqdm(dwi_dirs):
             dwi_dir = Path(dwi_dir_p)
             sub, ses = get_sub_ses_dwidir(dwi_dir)
             if not any(Path(dwi_dir).iterdir()):
@@ -1233,7 +1245,7 @@ class PreQualGenerator(ScriptGenerator):
                 similar = False
                 print("Error: Could not read json files {}. Assuming different acquisitions.".format(jsons))
 
-            if similar:
+            if similar and not self.setup.args.separate_prequal:
                 #if similar, run them together
                 PQdirs = self.get_PreQual_dirs_from_dwi(dwis, similar=True)
             else:
@@ -1260,7 +1272,7 @@ class PreQualGenerator(ScriptGenerator):
                 continue
 
             #now, for the PQdirs that need to be run, generate the scripts
-            for dir_num,pqdir in needPQdirs:
+            for dir_num,pqdir in enumerate(needPQdirs):
                 #self.inputs_dict = {self.count: #dwis, T1}
                 acq, run = self.get_BIDS_fields_from_PQdir(pqdir)
                 #get the PE direction for each of the scans
@@ -1268,7 +1280,7 @@ class PreQualGenerator(ScriptGenerator):
                     if need_json_dicts is None: #we dont know, so just set to None
                         PEaxis, PEsign, PEunknown = None, None, None
                     else:
-                        (PEaxis, PEsign, PEunknown) = get_PE_dirs(need_json_dicts[dir_num], need_jsons[dir_num], single=True) #returns a single tuple
+                        (PEaxis, PEsign, PEunknown) = get_PE_dirs([need_json_dicts[dir_num]], [need_jsons[dir_num]], single=True) #returns a single tuple
                     #definitely needs a T1 for synb0
                         needs_synb0 = True
                     #check for a T1
@@ -1295,7 +1307,8 @@ class PreQualGenerator(ScriptGenerator):
                         os.makedirs(PQdir_targ)
 
                     #setup the dtiQA config file
-                    self.setup_dtiQA_config(need_dwis[dir_num], PEsign, readout_times)
+                    #print(type(need_dwis[dir_num]), type(PEsign), type(readout_times))
+                    self.setup_dtiQA_config([need_dwis[dir_num]], PEsign, readout_times)
                     
                     #write the script
                     self.start_script_generation(session_input, session_output, PEaxis=PEaxis, deriv_output_dir=PQdir_targ)
@@ -1384,7 +1397,7 @@ class FreeSurferGenerator(ScriptGenerator):
         t1s = self.find_t1s()
 
         #for each T1, check to see if the freesurfer outputs exist
-        for t1 in t1s:
+        for t1 in tqdm(t1s):
             sub, ses, acq, run = self.get_BIDS_fields_t1(t1)
 
             #check to see if the freesurfer outputs exist
@@ -1448,7 +1461,7 @@ class SLANT_TICVGenerator(ScriptGenerator):
         t1s = self.find_t1s()
 
         #for each T1, check to see if the freesurfer outputs exist
-        for t1 in t1s:
+        for t1 in tqdm(t1s):
             sub, ses, acq, run = self.get_BIDS_fields_t1(t1)
 
             #check to see if the TICV exists
@@ -1530,7 +1543,7 @@ class UNestGenerator(ScriptGenerator):
             print("Skull stripped flag is on. Will look for skull stripped T1 for UNest.")
 
         #for each T1, check to see if the freesurfer outputs exist
-        for t1 in t1s:
+        for t1 in tqdm(t1s):
             sub, ses, acq, run = self.get_BIDS_fields_t1(t1)
 
             unest_dir = unest_dir = self.setup.dataset_derivs/(sub)/(ses)/("UNest{}{}".format(acq, run))
@@ -1618,7 +1631,7 @@ class SynthstripGenerator(ScriptGenerator):
         t1s = self.find_t1s()
 
         #for each T1, check to see if the freesurfer outputs exist
-        for t1 in t1s:
+        for t1 in tqdm(t1s):
             sub, ses, acq, run = self.get_BIDS_fields_t1(t1)     
 
             #first, check to make sure that the data does not already exist
@@ -1684,7 +1697,7 @@ class EVE3WMAtlasGenerator(ScriptGenerator):
 
         prequal_dirs = self.get_PreQual_dirs()
 
-        for pqdir_p in prequal_dirs:
+        for pqdir_p in tqdm(prequal_dirs):
             pqdir = Path(pqdir_p)
             #get the BIDS tags
             sub, ses, acq, run = self.get_BIDS_fields_from_PQdir(pqdir)
@@ -1772,7 +1785,7 @@ class MNI152WMAtlasGenerator(ScriptGenerator):
 
         prequal_dirs = self.get_PreQual_dirs()
 
-        for pqdir_p in prequal_dirs:
+        for pqdir_p in tqdm(prequal_dirs):
             pqdir = Path(pqdir_p)
             #get the BIDS tags
             sub, ses, acq, run = self.get_BIDS_fields_from_PQdir(pqdir)
@@ -1861,7 +1874,7 @@ class MaCRUISEGenerator(ScriptGenerator):
         t1s = self.find_t1s()
 
         #for each T1, check to see if the freesurfer outputs exist
-        for t1 in t1s:
+        for t1 in tqdm(t1s):
             sub, ses, acq, run = self.get_BIDS_fields_t1(t1)    
 
             #check to see if the MaCRUISE outputs exist already
@@ -1954,7 +1967,7 @@ class BiscuitGenerator(ScriptGenerator):
         t1s = self.find_t1s()
 
         #for each T1, check to see if the freesurfer outputs exist
-        for t1 in t1s:
+        for t1 in tqdm(t1s):
             sub, ses, acq, run = self.get_BIDS_fields_t1(t1)    
 
             #check to see if the Biscuit outputs exist already
@@ -2029,7 +2042,7 @@ class ConnectomeSpecialGenerator(ScriptGenerator):
 
         prequal_dirs = self.get_PreQual_dirs()
 
-        for pqdir_p in prequal_dirs:
+        for pqdir_p in tqdm(prequal_dirs):
             pqdir = Path(pqdir_p)
             #get the BIDS tags
             sub, ses, acq, run = self.get_BIDS_fields_from_PQdir(pqdir)
@@ -2212,7 +2225,7 @@ class TractsegGenerator(ScriptGenerator):
         
         prequal_dirs = self.get_PreQual_dirs()
 
-        for pqdir_p in prequal_dirs:
+        for pqdir_p in tqdm(prequal_dirs):
             pqdir = Path(pqdir_p)
             #get the BIDS tags
             sub, ses, acq, run = self.get_BIDS_fields_from_PQdir(pqdir) 
@@ -2304,7 +2317,7 @@ class FrancoisSpecialGenerator(ScriptGenerator):
 
         prequal_dirs = self.get_PreQual_dirs()
 
-        for pqdir_p in prequal_dirs:
+        for pqdir_p in tqdm(prequal_dirs):
             pqdir = Path(pqdir_p)
             #get the BIDS tags
             sub, ses, acq, run = self.get_BIDS_fields_from_PQdir(pqdir) 
@@ -2440,7 +2453,7 @@ class NODDIGenerator(ScriptGenerator):
 
         prequal_dirs = self.get_PreQual_dirs()
 
-        for pqdir_p in prequal_dirs:
+        for pqdir_p in tqdm(prequal_dirs):
             pqdir = Path(pqdir_p)
             #get the BIDS tags
             sub, ses, acq, run = self.get_BIDS_fields_from_PQdir(pqdir)
@@ -2771,7 +2784,9 @@ def get_json_dict(json_file):
     Return the dictionary from the json file
     """
     with open(json_file, 'r') as f:
-        return json.load(f)
+        contents = json.load(f)
+        #print(contents)
+        return contents
 
 def check_json_params_similarity(dicts):
     """
