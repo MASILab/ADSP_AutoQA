@@ -73,21 +73,21 @@ class ScriptGeneratorSetup:
     def __init__(self, args):
         
         #mapping for the script generator functions
-        self.PIPELINE_MAP = {
-            "freesurfer": self.freesurfer_script_generate,
-            "PreQual": self.PreQual_script_generate,
-            "SLANT-TICV": self.SLANT_TICV_script_generate,
-            "EVE3WMAtlas": self.EVE3Registration_script_generate,
-            "MNI152WMAtlas": self.MNI152Registration_script_generate,
-            "UNest": self.UNest_script_generate,
-            "synthstrip": self.synthstrip_script_generate,
-            "tractseg": self.tractseg_script_generate,
-            "MaCRUISE": self.macruise_script_generate,
-            "ConnectomeSpecial": self.connectome_special_script_generate,
-            "FrancoisSpecial": self.francois_special_script_generate,
-            "Biscuit": self.biscuit_script_generate,
-            'NODDI': self.noddi_script_generate
-        }
+        # self.PIPELINE_MAP = {
+        #     "freesurfer": self.freesurfer_script_generate,
+        #     "PreQual": self.PreQual_script_generate,
+        #     "SLANT-TICV": self.SLANT_TICV_script_generate,
+        #     "EVE3WMAtlas": self.EVE3Registration_script_generate,
+        #     "MNI152WMAtlas": self.MNI152Registration_script_generate,
+        #     "UNest": self.UNest_script_generate,
+        #     "synthstrip": self.synthstrip_script_generate,
+        #     "tractseg": self.tractseg_script_generate,
+        #     "MaCRUISE": self.macruise_script_generate,
+        #     "ConnectomeSpecial": self.connectome_special_script_generate,
+        #     "FrancoisSpecial": self.francois_special_script_generate,
+        #     "Biscuit": self.biscuit_script_generate,
+        #     'NODDI': self.noddi_script_generate
+        # }
 
         #mapping for the script generator class instances
         self.GENERATOR_MAP = {
