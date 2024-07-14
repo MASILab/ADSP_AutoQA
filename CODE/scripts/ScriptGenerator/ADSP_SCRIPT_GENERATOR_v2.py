@@ -354,89 +354,6 @@ class ScriptGeneratorSetup:
 
 class ScriptGenerator:
 
-    def __init__(self, setup_object):
-        
-        self.setup = setup_object
-
-        #these should be dictionaries or lists (or a dict of dicts!) that contain the inputs and outputs for the pipeline
-            #i.e. the names and the paths
-        self.inputs_dict = None
-        self.outputs_dict = None
-        self.yml_dict = None #yml files used for provenance tracking
-        self.count = 0 #count of the number of scripts that have been generated
-        self.missing_data = pd.DataFrame(columns=['sub', 'ses', 'acq', 'run', 'missing']) #missing data for the pipeline
-
-        #mapping for the pipeline specific script generation functions
-        self.PIPELINE_GENERATE_MAP = {
-            "freesurfer": self.freesurfer_script_generate,
-            "PreQual": self.PreQual_script_generate,
-            "SLANT-TICV": self.SLANT_TICV_script_generate,
-            "EVE3WMAtlas": self.EVE3Registration_script_generate,
-            "MNI152WMAtlas": self.MNI152Registration_script_generate,
-            "UNest": self.UNest_script_generate,
-            "synthstrip": self.synthstrip_script_generate,
-            "tractseg": self.tractseg_script_generate,
-            "MaCRUISE": self.macruise_script_generate,
-            "ConnectomeSpecial": self.connectome_special_script_generate,
-            "FrancoisSpecial": self.francois_special_script_generate,
-            "Biscuit": self.biscuit_script_generate,
-            'NODDI': self.noddi_script_generate
-        }
-
-        self.necessary_outputs = {
-            "PreQual": [
-                'PREPROCESSED/dwmri.nii.gz',
-                'PREPROCESSED/dwmri.bval',
-                'PREPROCESSED/dwmri.bvec',
-                'PREPROCESSED/mask.nii.gz',
-                'PDF/dtiQA.pdf'
-            ],
-            'freeseurfer': [
-                'freesurfer/scripts/recon-all.log' #any more to add? ask Kurt?
-            ],
-            'SLANT-TICV': [],
-            'UNest': [],
-            'synthstrip': [],
-            'EVE3WMAtlas': [
-                "dwmri%diffusionmetrics.csv",
-                "dwmri%ANTS_t1tob0.txt",
-                "dwmri%0GenericAffine.mat",
-                "dwmri%1InverseWarp.nii.gz",
-                "dwmri%Atlas_JHU_MNI_SS_WMPM_Type-III.nii.gz"              
-            ],
-            'MNI152WMAtlas': [
-                "dwmri%diffusionmetrics.csv",
-                "dwmri%ANTS_t1tob0.txt",
-                "dwmri%0GenericAffine.mat",
-                "dwmri%1InverseWarp.nii.gz",             
-            ],
-            'MaCRUISE': [
-                "Output/SegRefine/SEG_refine.nii.gz",
-                "Output/Surfaces_FreeView/target_image_GMimg_innerSurf.asc",
-                'Output/Surfaces_MNI/target_image_GMimg_innerSurf.asc'
-            ],
-            'Biscuit': [
-                'PDF/biscuit.pdf'
-            ],
-            'ConnectomeSpecial': ["CONNECTOME_Weight_MeanFA_NumStreamlines_10000000_Atlas_SLANT.csv", "CONNECTOME_Weight_NUMSTREAMLINES_NumStreamlines_10000000_Atlas_SLANT.csv",
-                "graphmeasures.json", "graphmeasures_nodes.json", "log.txt", "tracks_10000000_compressed.tck", "ConnectomeQA.png",
-                "CONNECTOME_NUMSTREAM.npy", "CONNECTOME_LENGTH.npy", "CONNECTOME_FA.npy", "b0.nii.gz", "atlas_slant_subj.nii.gz"
-            ],
-            'tractseg': [
-                {'targ_name': 'bundles'},
-                {'targ_name': 'measures'}
-            ],
-            'NODDI': [
-                'config.pickle',
-                'FIT_dir.nii.gz',
-                'FIT_ICVF.nii.gz',
-                'FIT_ISOVF.nii.gz',
-                'FIT_OD.nii.gz'
-            ]
-            ### TODO: add the necessary outputs for the other pipelines
-                #this cannot be static for all the outputs for all pipelines, only some of them
-        }
-
     ## ABSTRACT CLASSES TO BE IMPLEMENTED BY THE RESPECTIVE CHILD CLASSES ##
         
     def freesurfer_script_generate(self):
@@ -524,6 +441,89 @@ class ScriptGenerator:
         #raise NotImplementedError("Error: noddi_script_generate not implemented")
     
     ## END ABSTRACT CLASSES ##
+
+    def __init__(self, setup_object):
+        
+        self.setup = setup_object
+
+        #these should be dictionaries or lists (or a dict of dicts!) that contain the inputs and outputs for the pipeline
+            #i.e. the names and the paths
+        self.inputs_dict = None
+        self.outputs_dict = None
+        self.yml_dict = None #yml files used for provenance tracking
+        self.count = 0 #count of the number of scripts that have been generated
+        self.missing_data = pd.DataFrame(columns=['sub', 'ses', 'acq', 'run', 'missing']) #missing data for the pipeline
+
+        #mapping for the pipeline specific script generation functions
+        self.PIPELINE_GENERATE_MAP = {
+            "freesurfer": self.freesurfer_script_generate,
+            "PreQual": self.PreQual_script_generate,
+            "SLANT-TICV": self.SLANT_TICV_script_generate,
+            "EVE3WMAtlas": self.EVE3Registration_script_generate,
+            "MNI152WMAtlas": self.MNI152Registration_script_generate,
+            "UNest": self.UNest_script_generate,
+            "synthstrip": self.synthstrip_script_generate,
+            "tractseg": self.tractseg_script_generate,
+            "MaCRUISE": self.macruise_script_generate,
+            "ConnectomeSpecial": self.connectome_special_script_generate,
+            "FrancoisSpecial": self.francois_special_script_generate,
+            "Biscuit": self.biscuit_script_generate,
+            'NODDI': self.noddi_script_generate
+        }
+
+        self.necessary_outputs = {
+            "PreQual": [
+                'PREPROCESSED/dwmri.nii.gz',
+                'PREPROCESSED/dwmri.bval',
+                'PREPROCESSED/dwmri.bvec',
+                'PREPROCESSED/mask.nii.gz',
+                'PDF/dtiQA.pdf'
+            ],
+            'freeseurfer': [
+                'freesurfer/scripts/recon-all.log' #any more to add? ask Kurt?
+            ],
+            'SLANT-TICV': [],
+            'UNest': [],
+            'synthstrip': [],
+            'EVE3WMAtlas': [
+                "dwmri%diffusionmetrics.csv",
+                "dwmri%ANTS_t1tob0.txt",
+                "dwmri%0GenericAffine.mat",
+                "dwmri%1InverseWarp.nii.gz",
+                "dwmri%Atlas_JHU_MNI_SS_WMPM_Type-III.nii.gz"              
+            ],
+            'MNI152WMAtlas': [
+                "dwmri%diffusionmetrics.csv",
+                "dwmri%ANTS_t1tob0.txt",
+                "dwmri%0GenericAffine.mat",
+                "dwmri%1InverseWarp.nii.gz",             
+            ],
+            'MaCRUISE': [
+                "Output/SegRefine/SEG_refine.nii.gz",
+                "Output/Surfaces_FreeView/target_image_GMimg_innerSurf.asc",
+                'Output/Surfaces_MNI/target_image_GMimg_innerSurf.asc'
+            ],
+            'Biscuit': [
+                'PDF/biscuit.pdf'
+            ],
+            'ConnectomeSpecial': ["CONNECTOME_Weight_MeanFA_NumStreamlines_10000000_Atlas_SLANT.csv", "CONNECTOME_Weight_NUMSTREAMLINES_NumStreamlines_10000000_Atlas_SLANT.csv",
+                "graphmeasures.json", "graphmeasures_nodes.json", "log.txt", "tracks_10000000_compressed.tck", "ConnectomeQA.png",
+                "CONNECTOME_NUMSTREAM.npy", "CONNECTOME_LENGTH.npy", "CONNECTOME_FA.npy", "b0.nii.gz", "atlas_slant_subj.nii.gz"
+            ],
+            'tractseg': [
+                {'targ_name': 'bundles'},
+                {'targ_name': 'measures'}
+            ],
+            'NODDI': [
+                'config.pickle',
+                'FIT_dir.nii.gz',
+                'FIT_ICVF.nii.gz',
+                'FIT_ISOVF.nii.gz',
+                'FIT_OD.nii.gz'
+            ]
+            ### TODO: add the necessary outputs for the other pipelines
+                #this cannot be static for all the outputs for all pipelines, only some of them
+        }
 
     def find_t1s(self):
         """
