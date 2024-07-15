@@ -603,7 +603,7 @@ class ScriptGenerator:
 
     def get_BIDS_fields_t1(self, t1_path):
         pattern = r'(sub-\w+)(?:_(ses-\w+))?(?:_(acq-\w+))?(?:_(run-\d{1,2}))?_T1w'
-        matches = re.findall(pattern, t1_path.name)
+        matches = re.findall(pattern, t1_path)
         sub, ses, acq, run = matches[0][0], matches[0][1], matches[0][2], matches[0][3]
         return sub, ses, acq, run
 
@@ -1013,7 +1013,10 @@ class ScriptGenerator:
                     write_copy_to_input_line(self, script, input['src_path'], targ_file)
                     write_ssh_provenance_check(self, script, input['src_path'], targ_file)
                 else: #this is also a dict
-                    targ_file = session_input/input.name #alter name here if necessary
+                    try:
+                        targ_file = session_input/input.name #alter name here if necessary
+                    except:
+                        targ_file = session_input/input.split('/')[-1]
                     input_targets[key] = targ_file
                     write_copy_to_input_line(self, script, input, targ_file)
                     write_ssh_provenance_check(self, script, input, targ_file)
@@ -1027,6 +1030,9 @@ class ScriptGenerator:
             #remove the inputs
             #script.write('echo Done runnning PreQual. Now removing inputs...\n')
             script.write('rm -r {}\n'.format(str(session_input)+'/*'))
+
+            #write the yaml config file
+            self.write_config_yml_lines(script, session_output, kwargs['deriv_output_dir'])
 
             #copy ALL the outputs back to the output directory (and ensure the proper provenance?)
             ## TODO: Write the provenance check for the key outputs
@@ -1045,9 +1051,6 @@ class ScriptGenerator:
             #     else:
             #         write_ssh_provenance_check(self, script, session_output/key_file, kwargs['deriv_output_dir']/key_file)
             script.write("echo All outputs have been copied successfully.\n")
-
-            #write the yaml config file
-            self.write_config_yml_lines(script, session_output, kwargs['deriv_output_dir'])
 
             #remove the outputs
             script.write('echo Now removing outputs from local...\n')
@@ -1433,6 +1436,7 @@ class SLANT_TICVGenerator(ScriptGenerator):
 
         #self.warnings = {}
         self.outputs = {}
+        self.inputs_dict = {}
 
         self.generate_slant_ticv_scripts()
     
@@ -1446,12 +1450,15 @@ class SLANT_TICVGenerator(ScriptGenerator):
         #write the extra binds
         eb1 = "\"{}/\":/opt/slant/matlab/input_pre".format(session_input)
         eb2 = "\"{}/\":/opt/slant/matlab/input_post".format(session_input)
-        eb3 = "\"{}/\":/opt/slant/matlab/output_pre".format(session_output/'pre')
-        eb4 = "\"{}/\":/opt/slant/dl/working_dir".format(session_output/'dl')
-        eb5 = "\"{}/\":/opt/slant/matlab/output_post".format(session_output/'post')
+        eb3 = "\"{}/\":/opt/slant/matlab/output_pre".format(kwargs['pre'])
+        eb4 = "\"{}/\":/opt/slant/dl/working_dir".format(kwargs['dl'])
+        eb5 = "\"{}/\":/opt/slant/matlab/output_post".format(kwargs['post'])
 
         script.write("singularity exec -B {} -B {} -B {} -B {} -B {} -e {} /opt/slant/run.sh\n".format(eb1, eb2, eb3, eb4, eb5, self.setup.simg))
-        script.write("echo Finished running SLANT-TICV. Now removing inputs and copying outputs back...\n")
+        script.write("echo Finished running SLANT-TICV. Now removing pre and dl directories...\n")
+        script.write("rm -r {}/*\n".format(kwargs['pre']))
+        script.write("rm -r {}/*\n".format(kwargs['dl']))
+        script.write("echo Now removing inputs and copying outputs back...\n")
 
     def generate_slant_ticv_scripts(self):
         """
@@ -1466,7 +1473,7 @@ class SLANT_TICVGenerator(ScriptGenerator):
             sub, ses, acq, run = self.get_BIDS_fields_t1(t1)
 
             #check to see if the TICV exists
-            TICV_dir = self.dataset_derivs/(sub)/(ses)/("SLANT-TICVv1.2{}{}".format(acq, run))
+            TICV_dir = self.setup.dataset_derivs/(sub)/(ses)/("SLANT-TICVv1.2{}{}".format(acq, run))
             if not TICV_dir.exists():
                 os.makedirs(TICV_dir)
             #find_seg = "find {} -mindepth 3 -maxdepth 3 -name '*seg.nii.gz' \( -type f -o -type l \) ".format(TICV_dir)
@@ -1482,16 +1489,19 @@ class SLANT_TICVGenerator(ScriptGenerator):
                 os.makedirs(ticv_targ)
 
             #create the local temp directories
-            (session_input, session_output) = self.make_session_dirs(sub, ses, acq, run, tmp_input_dir=self.setup.tmp_input_dir,
-                                            tmp_output_dir=self.setup.tmp_output_dir, ticv=True)
+            (session_input, session_output, post, pre, dl) = self.make_session_dirs(sub, ses, acq, run,
+                                tmp_input_dir=self.setup.tmp_input_dir, tmp_output_dir=self.setup.tmp_output_dir, ticv=True)
         
             #setup the inputs dictionary and outputs
             self.inputs_dict[self.count] = {'t1': t1}
-            self.outputs[self.count] = [str(ticv_seg).split(str(TICV_dir))[1]]
+            #print(ticv_seg)
+            #print(str(ticv_seg).split(str(TICV_dir)))
+            self.outputs[self.count] = [t1.replace('.nii.gz', '_seg.nii.gz')]
 
             ##generate the script
-            special_copy = {'post', 'post'}
-            self.start_script_generation(session_input, session_output, deriv_output_dir=ticv_targ, special_copy=special_copy)            
+            #special_copy = {'post', 'post'}
+            self.start_script_generation(session_input, session_output, deriv_output_dir=ticv_targ, #special_copy=special_copy,
+                                         post=post, pre=pre, dl=dl)            
 
 class UNestGenerator(ScriptGenerator):
     """
