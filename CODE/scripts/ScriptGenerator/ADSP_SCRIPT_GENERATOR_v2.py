@@ -1372,6 +1372,7 @@ class FreeSurferGenerator(ScriptGenerator):
 
         #self.warnings = {}
         self.outputs = {}
+        self.inputs_dict = {}
 
         self.generate_freesurfer_scripts()    
 
@@ -1513,6 +1514,8 @@ class UNestGenerator(ScriptGenerator):
 
         #self.warnings = {}
         self.outputs = {}
+        self.inputs_dict = {}
+
 
         self.generate_unest_scripts()
 
@@ -1611,6 +1614,7 @@ class SynthstripGenerator(ScriptGenerator):
 
         #self.warnings = {}
         self.outputs = {}
+        self.inputs_dict = {}
 
         self.generate_synthstrip_scripts()
 
@@ -1688,6 +1692,7 @@ class EVE3WMAtlasGenerator(ScriptGenerator):
 
         #self.warnings = {}
         self.outputs = {}
+        self.inputs_dict = {}
 
         self.generate_EVE3WMAtlas_scripts()
 
@@ -1776,6 +1781,7 @@ class MNI152WMAtlasGenerator(ScriptGenerator):
 
         #self.warnings = {}
         self.outputs = {}
+        self.inputs_dict = {}
 
         self.generate_MNI152WMAtlas_scripts()
 
@@ -1864,6 +1870,7 @@ class MaCRUISEGenerator(ScriptGenerator):
 
         #self.warnings = {}
         self.outputs = {}
+        self.inputs_dict = {}
 
         self.generate_macruise_scripts()
 
@@ -1942,6 +1949,7 @@ class BiscuitGenerator(ScriptGenerator):
 
         #self.warnings = {}
         self.outputs = {}
+        self.inputs_dict = {}
 
         self.generate_biscuit_scripts()
 
@@ -2033,6 +2041,7 @@ class ConnectomeSpecialGenerator(ScriptGenerator):
 
         #self.warnings = {}
         self.outputs = {}
+        self.inputs_dict = {}
 
         self.generate_connectome_special_scripts()
 
@@ -2157,6 +2166,7 @@ class TractsegGenerator(ScriptGenerator):
 
         #self.warnings = {}
         self.outputs = {}
+        self.inputs_dict = {}
 
         self.generate_tractseg_scripts()
 
@@ -2300,6 +2310,7 @@ class FrancoisSpecialGenerator(ScriptGenerator):
 
         #self.warnings = {}
         self.outputs = {}
+        self.inputs_dict = {}
 
         self.generate_francois_scripts()
     
@@ -2435,6 +2446,7 @@ class NODDIGenerator(ScriptGenerator):
 
         self.warnings = {}
         self.outputs = {}
+        self.inputs_dict = {}
 
         self.generate_noddi_scripts()
 
