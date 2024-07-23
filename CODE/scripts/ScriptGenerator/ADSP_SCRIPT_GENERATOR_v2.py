@@ -210,15 +210,16 @@ class ScriptGeneratorSetup:
         try:
             mapping = {'SLANT-TICV': '/nobackup/p_masi/Singularities/nssSLANT_v1.2.simg',
                         'PreQual': '/nobackup/p_masi/Singularities/PreQual_v1.0.8.simg',
-                        'EVE3WMAtlas': '/nobackup/p_masi/Singularities/WMAtlas_v1.1.simg',
-                        'MNI152WMAtlas': '/nobackup/p_masi/Singularities/WMAtlas_v1.1.simg',
+                        'EVE3WMAtlas': '/nobackup/p_masi/Singularities/WMAtlas_v1.2.simg',
+                        'MNI152WMAtlas': '/nobackup/p_masi/Singularities/WMAtlas_v1.2.simg',
                         'UNest': '/nobackup/p_masi/Singularities/UNest.sif',
                         'tractseg': ["/nobackup/p_masi/Singularities/tractseg.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif"],
                         'MaCRUISE': "/nobackup/p_masi/Singularities/macruise_classern_v3.2.0.simg",
                         'FrancoisSpecial': '/nobackup/p_masi/Singularities/singularity_francois_special_v1.sif',
                         'ConnectomeSpecial': '/nobackup/p_masi/Singularities/ConnectomeSpecial.sif',
                         'Biscuit': '/nobackup/p_masi/Singularities/biscuit_FC_v2.2.sif',
-                        'NODDI': '/nobackup/p_masi/Singularities/tractoflow_2.2.1_b9a527_2021-04-13.sif'
+                        'NODDI': '/nobackup/p_masi/Singularities/tractoflow_2.2.1_b9a527_2021-04-13.sif',
+                        'DWI_plus_Tractseg': ["/nobackup/p_masi/Singularities/tractseg.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif", "/nobackup/p_masi/Singularities/WMAtlas_v1.2.simg"]
                     }
             simg = mapping[self.args.pipeline]
         except:
@@ -2787,12 +2788,20 @@ def get_PE_dirs(json_dicts, jsons, single=False):
         if 'ReversePE' in json_file.name:
             PEsign = '-'
         else:
-            if PEdir[0] == '-':
-                PEaxis = PEdir[1]
-                PEsign = '-'
-            elif PEdir[0] == '+':
-                PEaxis = PEdir[1]
-                PEsign = '-'
+            if PEdir[0] == '-' or PEdir[1] == '-':
+                if PEdir[0] == '-':
+                    PEaxis = PEdir[1]
+                    PEsign = '-'
+                else:
+                    PEaxis = PEdir[0]
+                    PEsign = '-'
+            elif PEdir[0] == '+' or PEdir[1] == '+':
+                if PEdir[0] == '+':
+                    PEaxis = PEdir[1]
+                    PEsign = '+'
+                else:
+                    PEaxis = PEdir[0]
+                    PEsign = '+'
             else: #if there is no direction, it is assumed to be positive
                 PEaxis = PEdir[0]
                 PEsign = '+'
