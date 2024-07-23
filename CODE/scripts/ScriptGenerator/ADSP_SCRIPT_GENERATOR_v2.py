@@ -58,7 +58,7 @@ def pa():
     p.add_argument('--time', type=str, default='24:00:00', help="Time to allocate per job for the slurm script 'HR:MIN:SEC'")
     p.add_argument('--slurm_script_output', type=str, default='', help="Path to the slurm script output")
     p.add_argument('--use_unest_seg', action='store_true', help="Use the UNest segmentation instead of SLANT-TICV for MaCRUISE, EVE3 registration, Connectome Special, etc.")
-    p.add_argument('--custom_simg_path', default='', type=str, help="Path to the custom singularity image file for whatever pipeline you are running")
+    p.add_argument('--custom_simg_path', default='', type=str, nargs='+', help="Path to the custom singularity image file for whatever pipeline you are running")
     p.add_argument('--no_accre', action='store_true', help="If you want to run not on ACCRE, but on a local machine. Will instead output a python file to parallelize the processing.")
     p.add_argument('--custom_atlas_input_dir', type=str, default='', help="For EVE3WMAtlas: custom path to the directory where the atlas inputs are stored")
     p.add_argument('--no_scp', action='store_true', help="If you do not want to scp the outputs to ACCRE (i.e. cp -L instead of scp)")
@@ -104,7 +104,8 @@ class ScriptGeneratorSetup:
             'ConnectomeSpecial': ConnectomeSpecialGenerator,
             "tractseg": TractsegGenerator,
             "NODDI": NODDIGenerator,
-            "FrancoisSpecial": FrancoisSpecialGenerator
+            "FrancoisSpecial": FrancoisSpecialGenerator,
+            "DWI_plus_Tractseg": DWI_plus_TractsegGenerator
 
             ##TODO: add the other pipelines
 
@@ -130,8 +131,10 @@ class ScriptGeneratorSetup:
         if args.custom_simg_path == '':
             self.simg = self.get_simg_path()
         else:
+            #make sure that this can take in a list of simg files as well
             self.simg = args.custom_simg_path
-            assert Path(self.simg).exists(), "Error: Custom singularity image file {} does not exist".format(str(self.simg))
+            for simg in self.simg:
+                assert Path(simg).exists(), "Error: Custom singularity image file {} does not exist".format(str(self.simg))
         self.pipeline = args.pipeline
         #vunetID
         if not args.vunetID:
@@ -277,6 +280,8 @@ class ScriptGeneratorSetup:
 
         #call the function that will generate the scripts
         #self.PIPELINE_MAP[self.pipeline](self.tmp_input_dir, self.tmp_output_dir)
+
+        print("Starting script generation for {} pipeline".format(self.pipeline))
 
         #start the script generation
         self.generator = self.GENERATOR_MAP[self.pipeline](self)
@@ -450,6 +455,13 @@ class ScriptGenerator:
         pass
         #raise NotImplementedError("Error: noddi_script_generate not implemented")
     
+    def dwi_plus_tractseg_script_generate(self):
+        """
+        Abstract method to be implemented by the child class
+        """
+        pass
+        #raise NotImplementedError("Error: dwi_plus_tractseg_script_generate not implemented")
+
     ## END ABSTRACT CLASSES ##
 
     def __init__(self, setup_object):
@@ -478,7 +490,8 @@ class ScriptGenerator:
             "ConnectomeSpecial": self.connectome_special_script_generate,
             "FrancoisSpecial": self.francois_special_script_generate,
             "Biscuit": self.biscuit_script_generate,
-            'NODDI': self.noddi_script_generate
+            'NODDI': self.noddi_script_generate,
+            "DWI_plus_Tractseg": self.dwi_plus_tractseg_script_generate
         }
 
         self.necessary_outputs = {
@@ -530,7 +543,9 @@ class ScriptGenerator:
                 'FIT_ICVF.nii.gz',
                 'FIT_ISOVF.nii.gz',
                 'FIT_OD.nii.gz'
-            ]
+            ],
+            'FrancoisSpecial': [],
+            'DWI_plus_Tractseg': []
             ### TODO: add the necessary outputs for the other pipelines
                 #this cannot be static for all the outputs for all pipelines, only some of them
         }
@@ -544,6 +559,7 @@ class ScriptGenerator:
         result = subprocess.run(find_cmd, shell=True, capture_output=True, text=True).stdout
         files = result.strip().splitlines()
         return files
+
 
     def find_dwis(self):
         """
@@ -2216,7 +2232,7 @@ class TractsegGenerator(ScriptGenerator):
         script.write("for i in {}/tractseg/TOM_trackings/*.tck; do\n".format(kwargs['temp_dir']))
         script.write('    echo "$i"; s=${i##*/}; s=${s%.tck}; echo $s;\n')
         script.write('    time singularity exec -B {}:{} --nv {} scil_evaluate_bundles_individual_measures.py {}/tractseg/TOM_trackings/$s.tck {}/tractseg/measures/$s-SHAPE.json --reference={}/dwmri_1mm_iso.nii.gz\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], scilus_simg, kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir']))
-        script.write('    time singularity exec -B {}:{} --nv {} scil_compute_bundle_mean_std.py {}/tractseg/TOM_trackings/$s.tck {}/dwmri_tensor_fa_1mm_iso.nii.gz {}/dwmri_tensor_md_1mm_iso.nii.gz {}/dwmri_tensor_ad_1mm_iso.nii.gz {}/dwmri_tensor_rd_1mm_iso.nii.gz --density_weighting --reference={}/dwmri_1mm_iso.nii.gz\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], scilus_simg, kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir']))
+        script.write('    time singularity exec -B {}:{} --nv {} scil_compute_bundle_mean_std.py {}/tractseg/TOM_trackings/$s.tck {}/dwmri_tensor_fa_1mm_iso.nii.gz {}/dwmri_tensor_md_1mm_iso.nii.gz {}/dwmri_tensor_ad_1mm_iso.nii.gz {}/dwmri_tensor_rd_1mm_iso.nii.gz --density_weighting --reference={}/dwmri_1mm_iso.nii.gz > {}/tractseg/measures/$s-SHAPE.json\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], scilus_simg, kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir']))
         script.write('done\n\n')
 
         script.write("echo Done computing measures per bundle. Now deleting temp inputs and re-organizing outputs...\n")
@@ -2539,6 +2555,200 @@ class NODDIGenerator(ScriptGenerator):
             #start the script generation
             self.start_script_generation(session_input, session_output, deriv_output_dir=noddi_target, dwi_mask=dwi_mask)
 
+#for Kurt: DTI + Tractseg on preprocessed data
+class DWI_plus_TractsegGenerator(ScriptGenerator):
+
+    def __init__(self, setup_object):
+        """
+        Class for taking dwi data from raw, computing the DTI metrics, and running TractSeg on the computed metrics
+        """
+        super().__init__(setup_object=setup_object)
+        #self.warnings = {}
+        self.outputs = {}
+        self.inputs_dict = {}
+
+        self.generate_dwi_plus_tractseg_scripts()
+
+    def dwi_plus_tractseg_script_generate(self, script, session_input, session_output, **kwargs):
+        """
+        Writes the command for running DTI + Tractseg to a script
+
+        inputs:
+            paths to 3 simgs
+            dwi files copied into the temp directory
+            temp directory (basically output directory)
+        """
+
+        #define the singularities
+        ts_simg = self.setup.simg[0]
+        scilus_simg = self.setup.simg[1]
+        mrtrix_simg = self.setup.simg[1]
+        dwi_simg = self.setup.simg[2]
+
+        #define the directories to bind
+        dti_dir = '{}/DTI'.format(kwargs['temp_dir'])
+        bind1 = "{}:/INPUTS".format(kwargs['temp_dir'])
+        bind2 = "{}:/OUTPUTS".format(dti_dir)
+
+        #first, convert the dwi to tensor
+        script.write("echo Making temp directories...\n")
+        script.write("mkdir -p {}\n".format(dti_dir))
+        script.write("echo Shelling to 1500...\n")
+        script.write("time singularity exec -B {} -B {} {} python3 /CODE/extract_single_shell.py\n".format(bind1, bind2, dwi_simg))
+        script.write("echo Done shelling to 1500. Now fitting tensors DTI...\n")
+
+        #1.) extract the b0
+        #2.) create the mask
+        #3.) fit the tensors
+        #4.) calculate the FA, MD, AD, RD
+
+        script.write("echo Extracting b0...\n")
+        b0 = "{}/dwmri_b0.nii.gz".format(dti_dir)
+        script.write("time singularity exec -B {}:{} {} bash -c \"dwiextract {}/dwmri.nii.gz -fslgrad {}/dwmri.bvec {}/dwmri.bval - -bzero | mrmath - mean {} -axis 3\"\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], b0))
+        script.write("echo Creating mask...\n")
+        mask = "{}/dwmri_mask.nii.gz".format(dti_dir)
+        script.write("time singularity exec -B {}:{} {} bet {} {} -f 0.25 -m -n -R\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, b0, mask))
+        script.write("echo Fitting tensors...\n")
+        shellbvec = "{}/dwmri%firstshell.bvec".format(dti_dir)
+        shellbval = "{}/dwmri%firstshell.bval".format(dti_dir)
+        shellnii = "{}/dwmri%firstshell.nii.gz".format(dti_dir)
+        tensor = "{}/dwmri_tensor.nii.gz".format(dti_dir)
+        script.write("time singularity exec -B {}:{} {} dwi2tensor -fslgrad {} {} {} {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, shellbvec, shellbval, shellnii, tensor))
+        script.write("echo Calculating FA, MD, AD, RD...\n")
+        fa = "{}/dwmri_tensor_fa.nii.gz".format(dti_dir)
+        md = "{}/dwmri_tensor_md.nii.gz".format(dti_dir)
+        ad = "{}/dwmri_tensor_ad.nii.gz".format(dti_dir)
+        rd = "{}/dwmri_tensor_rd.nii.gz".format(dti_dir)
+        script.write("time singularity exec -B {}:{} {} tensor2metric {} -fa {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, tensor, fa, mask))
+        script.write("time singularity exec -B {}:{} {} tensor2metric {} -adc {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, tensor, md, mask))
+        script.write("time singularity exec -B {}:{} {} tensor2metric {} -ad {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, tensor, ad, mask))
+        script.write("time singularity exec -B {}:{} {} tensor2metric {} -rd {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, tensor, rd, mask))
+        
+        #### NEED TO REWRITE THE REST BELOW TO USE THE DTI OUTPUTS STRUCTURED AS ABOVE
+
+        script.write("echo Resampling to 1mm iso...\n")
+        isodwi = "{}/dwmri_1mm_iso.nii.gz".format(dti_dir)
+        script.write("time singularity run -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, shellnii, isodwi))
+        #same for the fa, md, ad, rd
+        faiso = "{}/dwmri_tensor_fa_1mm_iso.nii.gz".format(dti_dir)
+        mdiso = "{}/dwmri_tensor_md_1mm_iso.nii.gz".format(dti_dir)
+        adiso = "{}/dwmri_tensor_ad_1mm_iso.nii.gz".format(dti_dir)
+        rdiso = "{}/dwmri_tensor_rd_1mm_iso.nii.gz".format(dti_dir)
+        script.write("time singularity run -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, mrtrix_simg, fa, faiso))
+        script.write("time singularity run -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, mrtrix_simg, md, mdiso))
+        script.write("time singularity run -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, mrtrix_simg, ad, adiso))
+        script.write("time singularity run -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, mrtrix_simg, rd, rdiso))
+
+        script.write("echo Done resampling to 1mm iso. Now running TractSeg...\n")
+        script.write('echo "..............................................................................."\n')
+        if not self.setup.args.no_accre:
+            script.write("echo Loading FSL...\n")
+
+            script.write("export FSL_DIR=/accre/arch/easybuild/software/MPI/GCC/6.4.0-2.28/OpenMPI/2.1.1/FSL/5.0.10/fsl\n")
+            script.write("source setup_accre_runtime_dir\n")
+
+        tractsegdir = "{}/tractseg".format(kwargs['temp_dir'])
+        script.write("time singularity run -B {}:{} -B {}:{} {} TractSeg -i {} --raw_diffusion_input -o {} --bvals {} --bvecs {}\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, isodwi, tractsegdir, shellbval, shellbvec))
+        script.write('if [[ -f "{}/peaks.nii.gz" ]]; then echo "Successfully created peaks.nii.gz for {}"; error_flag=0; else echo "Improper bvalue/bvector distribution for {}"; error_flag=1; fi\n'.format(tractsegdir, kwargs['temp_dir'], kwargs['temp_dir']))
+        script.write('if [[ $error_flag -eq 1 ]]; then echo "Improper bvalue/bvector distribution for {} >> {}/report_bad_bvector.txt"; fi\n\n'.format(kwargs['temp_dir'], kwargs['temp_dir']))        
+
+        script.write("if [[ $error_flag -eq 1 ]]; then\n")
+        script.write("echo Tractseg ran with error. Now exiting...\n")
+        script.write("exit 1\n")
+        script.write("fi\n\n")
+
+        script.write("time singularity run -B {}:{} -B {}:{} {} TractSeg -i {}/peaks.nii.gz -o {} --output_type endings_segmentation\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, tractsegdir, tractsegdir))
+        script.write("time singularity run -B {}:{} -B {}:{} {} TractSeg -i {}/peaks.nii.gz -o {} --output_type TOM\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, tractsegdir, tractsegdir))
+        script.write("time singularity run -B {}:{} -B {}:{} {} Tracking -i {}/peaks.nii.gz -o {} --tracking_format tck\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, tractsegdir, tractsegdir))
+
+        script.write('echo "..............................................................................."\n')
+        script.write("echo Done running TractSeg. Now computing measures per bundle...\n")
+        script.write("mkdir {}/measures\n".format(tractsegdir))
+
+        trackingdir = "{}/TOM_trackings".format(tractsegdir)
+        measuresdir = "{}/measures".format(tractsegdir)
+        script.write("for i in {}/TOM_trackings/*.tck; do\n".format(tractsegdir))
+        script.write('    echo "$i"; s=${i##*/}; s=${s%.tck}; echo $s;\n')
+        script.write('    time singularity exec -B {}:{} --nv {} scil_evaluate_bundles_individual_measures.py {}/$s.tck {}/$s-SHAPE.json --reference={}\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], scilus_simg, trackingdir, measuresdir, isodwi))
+        script.write('    time singularity exec -B {}:{} --nv {} scil_compute_bundle_mean_std.py {}/$s.tck {} {} {} {} --density_weighting --reference={} > {}/$s-DTI.json\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], scilus_simg, trackingdir, faiso, mdiso, adiso, rdiso, isodwi, measuresdir))
+        script.write('done\n\n')
+
+        script.write("echo Done computing measures per bundle. Now deleting temp inputs and re-organizing outputs...\n")
+        #script.write("rm -r {}/tractseg/TOM\n".format(kwargs['temp_dir']))
+        #script.write("rm -r {}/tractseg/peaks.nii.gz\n".format(kwargs['temp_dir']))
+        #script.write("rm -r {}/dwmri.nii.gz\n".format(kwargs['temp_dir']))
+        #script.write("rm -r {}/dwmri_1mm_iso.nii.gz\n".format(kwargs['temp_dir']))
+        #script.write("rm {}/dwmri_tensor_fa.nii.gz\n".format(kwargs['temp_dir']))
+        #script.write("rm {}/dwmri_tensor_md.nii.gz\n".format(kwargs['temp_dir']))
+        #script.write("rm {}/dwmri_tensor_ad.nii.gz\n".format(kwargs['temp_dir']))
+        #script.write("rm {}/dwmri_tensor_rd.nii.gz\n".format(kwargs['temp_dir']))
+        script.write("mv {}/tractseg/TOM_trackings {}/bundles\n".format(kwargs['temp_dir'], kwargs['temp_dir']))
+        script.write("mv {}/tractseg/measures {}/\n".format(kwargs['temp_dir'], kwargs['temp_dir']))
+
+        script.write("echo Done re-organizing outputs. Now copying back to output directory...\n")
+
+    def generate_dwi_plus_tractseg_scripts(self):
+        """
+        Generates the scripts for running DTI + TractSeg
+        """
+
+        root_temp = Path(self.setup.args.temp_dir)
+        assert root_temp.exists() and os.access(root_temp, os.W_OK), "Error: Root temp directory {} does not exist or is not writable".format(root_temp)
+
+        #get the accre home directory / home directory for the tractseg inputs
+        if self.setup.args.no_accre:
+            accre_home_directory = os.path.expanduser("~")
+            user = accre_home_directory.split('/')[-1]
+            accre_home_directory = "/home/local/VANDERBILT/{}/".format(user)
+        else:
+            accre_home_directory = os.path.expanduser("~")   
+
+        #get the raw dwi files
+        dwis = self.find_dwis()
+
+        for dwi_p in tqdm(dwis):
+            dwi = Path(dwi_p)
+
+            #get the sub, ses, acq, run
+            sub, ses, acq, run = self.get_BIDS_fields_dwi(dwi)
+
+            #check to see if the outputs exist already
+            
+            ##TODO
+
+            #get the bval and bvec files for the dwis
+            bval = Path(dwi_p.replace('dwi.nii.gz', 'dwi.bval'))
+            bvec = Path(dwi_p.replace('dwi.nii.gz', 'dwi.bvec'))
+
+            #make sure that the bval and bvec and nii files exist
+            assert dwi.exists() and bval.exists() and bvec.exists(), "Error: dwi, bval, or bvec file does not exist for {}".format(dwi)
+
+            self.count += 1
+
+            #create the temp session directories
+            session_temp = root_temp/(sub)/("{}{}{}".format(ses,acq,run))
+            (session_input, session_output, session_temp) = self.make_session_dirs(sub, ses, acq, run, tmp_input_dir=self.setup.tmp_input_dir,
+                                            tmp_output_dir=self.setup.tmp_output_dir, temp_dir=root_temp, has_temp=True)
+
+            #create the target output directory
+            tractsegdwi_target = self.setup.output_dir/(sub)/(ses)/("DWI_plus_Tractseg{}{}".format(acq, run))
+            if not tractsegdwi_target.exists():
+                os.makedirs(tractsegdwi_target)
+
+            #setup the inputs dictionary
+                #need dwi, bval, bvec
+            self.inputs_dict[self.count] = {
+                'dwi': {'src_path': dwi, 'targ_name': 'dwmri.nii.gz', 'separate_input': session_temp},
+                'bval': {'src_path': bval, 'targ_name': 'dwmri.bval', 'separate_input': session_temp},
+                'bvec': {'src_path': bvec, 'targ_name': 'dwmri.bvec', 'separate_input': session_temp}
+            }
+            self.outputs[self.count] = []
+
+            #start the script generation
+            self.start_script_generation(session_input, session_output, deriv_output_dir=tractsegdwi_target, temp_dir=session_temp,
+                                        tractseg_setup=True, accre_home=accre_home_directory, temp_is_output=True)
+
+
 
 
 def get_shells_and_dirs(PQdir, bval_files, bvec_files):
@@ -2788,18 +2998,22 @@ def get_PE_dirs(json_dicts, jsons, single=False):
         if 'ReversePE' in json_file.name:
             PEsign = '-'
         else:
-            if PEdir[0] == '-' or PEdir[1] == '-':
-                if PEdir[0] == '-':
-                    PEaxis = PEdir[1]
-                    PEsign = '-'
-                else:
-                    PEaxis = PEdir[0]
-                    PEsign = '-'
-            elif PEdir[0] == '+' or PEdir[1] == '+':
-                if PEdir[0] == '+':
-                    PEaxis = PEdir[1]
-                    PEsign = '+'
-                else:
+            if len(PEdir) == 2:
+                if PEdir[0] == '-' or PEdir[1] == '-':
+                    if PEdir[0] == '-':
+                        PEaxis = PEdir[1]
+                        PEsign = '-'
+                    else:
+                        PEaxis = PEdir[0]
+                        PEsign = '-'
+                elif PEdir[0] == '+' or PEdir[1] == '+':
+                    if PEdir[0] == '+':
+                        PEaxis = PEdir[1]
+                        PEsign = '+'
+                    else:
+                        PEaxis = PEdir[0]
+                        PEsign = '+'
+                else: #if there is no direction, it is assumed to be positive
                     PEaxis = PEdir[0]
                     PEsign = '+'
             else: #if there is no direction, it is assumed to be positive
