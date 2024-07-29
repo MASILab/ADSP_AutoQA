@@ -213,6 +213,7 @@ class ScriptGeneratorSetup:
         try:
             mapping = {'SLANT-TICV': '/nobackup/p_masi/Singularities/nssSLANT_v1.2.simg',
                         'PreQual': '/nobackup/p_masi/Singularities/PreQual_v1.0.8.simg',
+                        'freesurfer': '/nobackup/p_masi/Singularities/freesurfer_7.2.0.sif',
                         'EVE3WMAtlas': '/nobackup/p_masi/Singularities/WMAtlas_v1.2.simg',
                         'MNI152WMAtlas': '/nobackup/p_masi/Singularities/WMAtlas_v1.2.simg',
                         'UNest': '/nobackup/p_masi/Singularities/UNest.sif',
@@ -1407,7 +1408,8 @@ class FreeSurferGenerator(ScriptGenerator):
 
         #write the recon-all command
         script.write("echo Running recon-all on T1...\n")
-        script.write('recon-all -i {} -subjid freesurfer -sd {}/ -all\n'.format(kwargs['input_targets']['t1'], session_output))
+        script.write('time singularity exec -c --contain -B {}:/usr/local/freesurfer/.license -B {}:{} -B {}:{} {} recon-all -i {} -subjid freesurfer -sd {}/ -all\n'.format(self.setup.freesurfer_license_path, session_input, session_input, session_output, session_output, self.setup.simg, kwargs['input_targets']['t1'], session_output))
+        #"time singularity exec -e --contain -B {}:/usr/local/freesurfer/.license -B {}:{} -B {}:{} {} recon-all -i {} -subjid freesurfer -sd {}/ -all > {}/freesurfer.log".format(license_file, t1, t1, out_dir, out_dir, simg_path, t1, out_dir, out_dir)
         script.write("echo Finished running recon-all. Now removing inputs and copying outputs back...\n")
 
     def generate_freesurfer_scripts(self):
