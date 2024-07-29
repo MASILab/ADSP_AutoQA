@@ -320,7 +320,7 @@ class ScriptGeneratorSetup:
             slurm.write("    script, log = input[0], input[1]\n")
             slurm.write("    with open(log, 'w') as file:\n")
             slurm.write("        run_cmd = 'bash {}'.format(script)\n")
-            slurm.write("        subprocess.run(run_cmd, shell=True, stdout=file)\n")
+            slurm.write("        subprocess.run(run_cmd, shell=True, stdout=file, stderr=subprocess.STDOUT)\n")
             slurm.write("\n")
             slurm.write("scriptsdir = Path('{}')\n".format(self.script_dir))
             slurm.write("logsdir = Path('{}')\n".format(self.log_dir))
@@ -1075,9 +1075,9 @@ class ScriptGenerator:
 
             ## TODO: Delete any temp files created for the pipeline
             if 'temp_dir' in kwargs:
-                script.write('rm -r {}\n'.format(kwargs['temp_dir']))
+                script.write('rm -r {}/*\n'.format(kwargs['temp_dir']))
             if 'working_dir' in kwargs:
-                script.write('rm -r {}\n'.format(kwargs['working_dir']))
+                script.write('rm -r {}/*\n'.format(kwargs['working_dir']))
 
     def write_config_yml(self, deriv_output):
         """
@@ -2232,7 +2232,7 @@ class TractsegGenerator(ScriptGenerator):
         script.write("for i in {}/tractseg/TOM_trackings/*.tck; do\n".format(kwargs['temp_dir']))
         script.write('    echo "$i"; s=${i##*/}; s=${s%.tck}; echo $s;\n')
         script.write('    time singularity exec -B {}:{} --nv {} scil_evaluate_bundles_individual_measures.py {}/tractseg/TOM_trackings/$s.tck {}/tractseg/measures/$s-SHAPE.json --reference={}/dwmri_1mm_iso.nii.gz\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], scilus_simg, kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir']))
-        script.write('    time singularity exec -B {}:{} --nv {} scil_compute_bundle_mean_std.py {}/tractseg/TOM_trackings/$s.tck {}/dwmri_tensor_fa_1mm_iso.nii.gz {}/dwmri_tensor_md_1mm_iso.nii.gz {}/dwmri_tensor_ad_1mm_iso.nii.gz {}/dwmri_tensor_rd_1mm_iso.nii.gz --density_weighting --reference={}/dwmri_1mm_iso.nii.gz > {}/tractseg/measures/$s-SHAPE.json\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], scilus_simg, kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir']))
+        script.write('    time singularity exec -B {}:{} --nv {} scil_compute_bundle_mean_std.py {}/tractseg/TOM_trackings/$s.tck {}/dwmri_tensor_fa_1mm_iso.nii.gz {}/dwmri_tensor_md_1mm_iso.nii.gz {}/dwmri_tensor_ad_1mm_iso.nii.gz {}/dwmri_tensor_rd_1mm_iso.nii.gz --density_weighting --reference={}/dwmri_1mm_iso.nii.gz > {}/tractseg/measures/$s-DTI.json\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], scilus_simg, kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir']))
         script.write('done\n\n')
 
         script.write("echo Done computing measures per bundle. Now deleting temp inputs and re-organizing outputs...\n")
