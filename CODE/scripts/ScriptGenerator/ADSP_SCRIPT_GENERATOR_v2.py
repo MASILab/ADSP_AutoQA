@@ -64,6 +64,7 @@ def pa():
     p.add_argument('--no_scp', action='store_true', help="If you do not want to scp the outputs to ACCRE (i.e. cp -L instead of scp)")
     p.add_argument('--src_server', type=str, default='landman01.accre.vanderbilt.edu', help="Source server for scp")
     p.add_argument('--separate_prequal', action='store_true', help="If you want to run all DWI separately through PreQual, regardless of whether the can be run together")
+    p.add_argument('--custom_home', default='', type=str, help="Path to the custom home directory for the user if --no_accre is set (for Tractseg)")
     return p.parse_args()
 
 class ScriptGeneratorSetup:
@@ -135,6 +136,8 @@ class ScriptGeneratorSetup:
             self.simg = args.custom_simg_path
             for simg in self.simg:
                 assert Path(simg).exists(), "Error: Custom singularity image file {} does not exist".format(str(self.simg))
+            if len(self.simg) == 1:
+                self.simg = self.simg[0]
         self.pipeline = args.pipeline
         #vunetID
         if not args.vunetID:
@@ -546,7 +549,8 @@ class ScriptGenerator:
                 'FIT_OD.nii.gz'
             ],
             'FrancoisSpecial': [],
-            'DWI_plus_Tractseg': []
+            'DWI_plus_Tractseg': [],
+            'freesurfer': []
             ### TODO: add the necessary outputs for the other pipelines
                 #this cannot be static for all the outputs for all pipelines, only some of them
         }
@@ -2216,7 +2220,7 @@ class TractsegGenerator(ScriptGenerator):
 
         script.write("time singularity run -B {}:{} -B {}:{} {} TractSeg -i {}/dwmri_1mm_iso.nii.gz --raw_diffusion_input -o {}/tractseg --bvals {}/dwmri.bval --bvecs {}/dwmri.bvec\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir']))
         script.write('if [[ -f "{}/tractseg/peaks.nii.gz" ]]; then echo "Successfully created peaks.nii.gz for {}"; error_flag=0; else echo "Improper bvalue/bvector distribution for {}"; error_flag=1; fi\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir']))
-        script.write('if [[ $error_flag -eq 1 ]]; then echo "Improper bvalue/bvector distribution for {} >> {}/report_bad_bvector.txt"; fi\n\n'.format(kwargs['temp_dir'], kwargs['temp_dir']))        
+        script.write('if [[ $error_flag -eq 1 ]]; then echo "Improper bvalue/bvector distribution for {}" >> {}/report_bad_bvector.txt; fi\n\n'.format(kwargs['temp_dir'], kwargs['temp_dir']))        
 
         script.write("if [[ $error_flag -eq 1 ]]; then\n")
         script.write("echo Tractseg ran with error. Now exiting...\n")
@@ -2261,7 +2265,15 @@ class TractsegGenerator(ScriptGenerator):
         assert root_temp.exists() and os.access(root_temp, os.W_OK), "Error: Root temp directory {} does not exist or is not writable".format(root_temp)
 
         #get the accre home directory / home directory for the tractseg inputs
-        accre_home_directory = os.path.expanduser("~")    
+        if self.setup.args.no_accre:
+            if self.setup.args.custom_home != '':
+                accre_home_directory = self.setup.args.custom_home
+            else:
+                accre_home_directory = os.path.expanduser("~")
+                user = accre_home_directory.split('/')[-1]
+                accre_home_directory = "/home/local/VANDERBILT/{}/".format(user)
+        else:
+            accre_home_directory = os.path.expanduser("~")     
         
         prequal_dirs = self.get_PreQual_dirs()
 
@@ -2652,7 +2664,7 @@ class DWI_plus_TractsegGenerator(ScriptGenerator):
         tractsegdir = "{}/tractseg".format(kwargs['temp_dir'])
         script.write("time singularity run -B {}:{} -B {}:{} {} TractSeg -i {} --raw_diffusion_input -o {} --bvals {} --bvecs {}\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, isodwi, tractsegdir, shellbval, shellbvec))
         script.write('if [[ -f "{}/peaks.nii.gz" ]]; then echo "Successfully created peaks.nii.gz for {}"; error_flag=0; else echo "Improper bvalue/bvector distribution for {}"; error_flag=1; fi\n'.format(tractsegdir, kwargs['temp_dir'], kwargs['temp_dir']))
-        script.write('if [[ $error_flag -eq 1 ]]; then echo "Improper bvalue/bvector distribution for {} >> {}/report_bad_bvector.txt"; fi\n\n'.format(kwargs['temp_dir'], kwargs['temp_dir']))        
+        script.write('if [[ $error_flag -eq 1 ]]; then echo "Improper bvalue/bvector distribution for {}" >> {}/report_bad_bvector.txt; fi\n\n'.format(kwargs['temp_dir'], kwargs['temp_dir']))        
 
         script.write("if [[ $error_flag -eq 1 ]]; then\n")
         script.write("echo Tractseg ran with error. Now exiting...\n")
@@ -2699,9 +2711,12 @@ class DWI_plus_TractsegGenerator(ScriptGenerator):
 
         #get the accre home directory / home directory for the tractseg inputs
         if self.setup.args.no_accre:
-            accre_home_directory = os.path.expanduser("~")
-            user = accre_home_directory.split('/')[-1]
-            accre_home_directory = "/home/local/VANDERBILT/{}/".format(user)
+            if self.setup.args.custom_home != '':
+                accre_home_directory = self.setup.args.custom_home
+            else:
+                accre_home_directory = os.path.expanduser("~")
+                user = accre_home_directory.split('/')[-1]
+                accre_home_directory = "/home/local/VANDERBILT/{}/".format(user)
         else:
             accre_home_directory = os.path.expanduser("~")   
 
