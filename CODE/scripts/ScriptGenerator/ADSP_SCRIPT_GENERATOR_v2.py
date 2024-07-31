@@ -106,7 +106,8 @@ class ScriptGeneratorSetup:
             "tractseg": TractsegGenerator,
             "NODDI": NODDIGenerator,
             "FrancoisSpecial": FrancoisSpecialGenerator,
-            "DWI_plus_Tractseg": DWI_plus_TractsegGenerator
+            "DWI_plus_Tractseg": DWI_plus_TractsegGenerator,
+            "freewater": FreewaterGenerator
 
             ##TODO: add the other pipelines
 
@@ -226,6 +227,7 @@ class ScriptGeneratorSetup:
                         'ConnectomeSpecial': '/nobackup/p_masi/Singularities/ConnectomeSpecial.sif',
                         'Biscuit': '/nobackup/p_masi/Singularities/biscuit_FC_v2.2.sif',
                         'NODDI': '/nobackup/p_masi/Singularities/tractoflow_2.2.1_b9a527_2021-04-13.sif',
+                        'freewater': '/nobackup/p_masi/Singularities/FreeWaterEliminationv2.sif',
                         'DWI_plus_Tractseg': ["/nobackup/p_masi/Singularities/tractseg.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif", "/nobackup/p_masi/Singularities/WMAtlas_v1.2.simg"]
                     }
             simg = mapping[self.args.pipeline]
@@ -267,8 +269,8 @@ class ScriptGeneratorSetup:
         assert os.access(self.args.log_dir, os.W_OK), "Error: do not have write permissions for logs dir {}".format(str(self.args.log_dir))
         assert os.access(self.output_dir, os.W_OK), "Error: do not have write permissions for final output dir {}".format(str(self.output_dir))
 
-        #For prequal, check for the FS license
-        if self.args.pipeline == "PreQual":
+        #For prequal, freesurfer, biscuit, check for the FS license
+        if self.args.pipeline == "PreQual" or self.args.pipeline == 'freeesurfer' or self.args.pipeline == 'Biscuit':
             assert Path(self.args.freesurfer_license_path).exists(), "Error: freesurfer license file does not exist at {}".format(str(self.args.freesurfer_license_path))
 
         #check to make sure that the scripts and logs directories are empty
@@ -459,6 +461,13 @@ class ScriptGenerator:
         pass
         #raise NotImplementedError("Error: noddi_script_generate not implemented")
     
+    def freewater_script_generate(self):
+        """
+        Abstract method to be implemented by the child class
+        """
+        pass
+        #raise NotImplementedError("Error: freewater_script_generate not implemented")
+
     def dwi_plus_tractseg_script_generate(self):
         """
         Abstract method to be implemented by the child class
@@ -495,6 +504,7 @@ class ScriptGenerator:
             "FrancoisSpecial": self.francois_special_script_generate,
             "Biscuit": self.biscuit_script_generate,
             'NODDI': self.noddi_script_generate,
+            'freewater': self.freewater_script_generate,
             "DWI_plus_Tractseg": self.dwi_plus_tractseg_script_generate
         }
 
@@ -548,6 +558,7 @@ class ScriptGenerator:
                 'FIT_ISOVF.nii.gz',
                 'FIT_OD.nii.gz'
             ],
+            'freewater': [],
             'FrancoisSpecial': [],
             'DWI_plus_Tractseg': [],
             'freesurfer': []
@@ -603,13 +614,13 @@ class ScriptGenerator:
         
         if similar:
             sub, ses, acq, run = self.get_BIDS_fields_dwi(dwis[0])
-            PQdir = self.setup.dataset_derivs / 'derivatives' / sub / ses / 'PreQual'
+            PQdir = self.setup.dataset_derivs  / sub / ses / 'PreQual'
             return [PQdir]
         else:
             PQdirs = []
             for dwi in dwis:
                 sub, ses, acq, run = self.get_BIDS_fields_dwi(dwi)
-                PQdir = self.setup.dataset_derivs / 'derivatives' / sub / ses / 'PreQual{}{}'.format(acq, run)
+                PQdir = self.setup.dataset_derivs / sub / ses / 'PreQual{}{}'.format(acq, run)
                 PQdirs.append(PQdir)
             return PQdirs
     
@@ -637,6 +648,7 @@ class ScriptGenerator:
         dwi = preproc_dir/("dwmri.nii.gz")
         bval = preproc_dir/("dwmri.bval")
         bvec = preproc_dir/("dwmri.bvec")
+        mask = preproc_dir/("mask.nii.gz")
 
         #also check to see if the PDF is there
         pdf_dir = pqdir/("PDF")
@@ -644,7 +656,7 @@ class ScriptGenerator:
 
         hasPQ = True
         hasPDF = True
-        if not dwi.exists() or not bval.exists() or not bvec.exists():
+        if not dwi.exists() or not bval.exists() or not bvec.exists() or not mask.exists():
             hasPQ = False
         if not pdf.exists():
             hasPDF = False
@@ -693,6 +705,26 @@ class ScriptGenerator:
         if all([(cs_dir/f).exists() for f in files]):
             return True
         return False
+
+    def has_freewater_outputs(self, freewater_dir):
+        """
+        Checks to see if the freewater outputs exist in a directory
+        """
+
+        fa = freewater_dir/("freewater_fa.nii.gz")
+        md = freewater_dir/("freewater_md.nii.gz")
+        rd = freewater_dir/("freewater_rd.nii.gz")
+        ad = freewater_dir/("freewater_ad.nii.gz")
+        #for some reason, these are output differently for single vs multishell
+        fw = freewater_dir/("freewater.nii.gz")
+        frac = freewater_dir/("freewater_fraction.nii.gz")
+
+        if not fa.exists() or not md.exists() or not rd.exists() or not ad.exists() or (not fw.exists() and not frac.exists()):
+            return False
+    
+        return True
+
+
 
     def has_Tractseg_outputs(self, tsdir):
         """
@@ -1279,6 +1311,9 @@ class PreQualGenerator(ScriptGenerator):
                 PQdirs = self.get_PreQual_dirs_from_dwi(dwis, similar=False)
 
             #for each of the potential PreQuals, check to see if the outputs already exist
+            # for x in PQdirs:
+            #     if not all(self.check_PQ_outputs(x)):
+            #         print(x)
             needPQdirs = [x for x in PQdirs if not all(self.check_PQ_outputs(x))]
             #get the dwis and jsons that correspond to the PQdirs
             idxs = [PQdirs.index(x) for x in needPQdirs]
@@ -1299,10 +1334,12 @@ class PreQualGenerator(ScriptGenerator):
 
             #now, for the PQdirs that need to be run, generate the scripts
             for dir_num,pqdir in enumerate(needPQdirs):
+
                 #self.inputs_dict = {self.count: #dwis, T1}
                 acq, run = self.get_BIDS_fields_from_PQdir(pqdir)
                 #get the PE direction for each of the scans
                 if not similar: #RUN dwis SEPARATELY
+
                     if need_json_dicts is None: #we dont know, so just set to None
                         PEaxis, PEsign, PEunknown = None, None, None
                     else:
@@ -2568,6 +2605,73 @@ class NODDIGenerator(ScriptGenerator):
 
             #start the script generation
             self.start_script_generation(session_input, session_output, deriv_output_dir=noddi_target, dwi_mask=dwi_mask)
+
+class freewaterGenerator(ScriptGenerator):
+    """
+    Class for generating freewater scripts
+    """
+
+    def __init__(self, setup_object):
+        super().__init__(setup_object=setup_object)
+
+        self.warnings = {}
+        self.outputs = {}
+        self.inputs_dict = {}
+
+        self.generate_freewater_scripts()
+
+    def freewater_script_generate(self, script, session_input, session_output, **kwargs):
+        """
+        Method for writing the commands for running freewater to a script
+        """
+        
+        script.write("echo Running FreeWater...\n")
+        script.write("echo singularity run -B {}:/input -B {}:/output {} dwmri.nii.gz dwmri.bval dwmri.bvec mask.nii.gz\n".format(session_input, session_output, self.setup.simg))
+        #singularity run -B inputs/:/input -B outputs/:/output ../FreeWaterEliminationv2.sif dwmri.nii.gz dwmri.bval dwmri.bvec mask.nii.gz
+
+    def generate_freewater_scripts(self):
+        """
+        Method for generating freewater scripts for a dataset
+        """
+
+        #first, get the PreQual directories
+        prequal_dirs = self.get_PreQual_dirs()
+
+        for pqdir_p in tqdm(prequal_dirs):
+            pqdir = Path(pqdir_p)
+            #get the BIDS tags
+            sub, ses, acq, run = self.get_BIDS_fields_from_PQdir(pqdir)
+            #check to see if the freewater outputs already exist
+            freewater_dir = self.setup.dataset_derivs/(sub)/(ses)/("freewater{}{}".format(acq, run))
+            if self.has_freewater_outputs(freewater_dir):
+                continue
+
+            #check to see if the PreQual outputs exist
+            if not all(self.check_PQ_outputs(pqdir)):
+                self.add_to_missing(sub, ses, acq, run, 'PreQual')
+                continue
+
+            #all the inputs exist and the outputs do not, so we can generate the script
+
+            self.count += 1
+
+            #setup the temp directories
+            (session_input, session_output) = self.make_session_dirs(sub, ses, acq, run, tmp_input_dir=self.setup.tmp_input_dir,
+                                            tmp_output_dir=self.setup.tmp_output_dir)
+            
+            #create the output target directory
+            fw_target = self.setup.output_dir/(sub)/(ses)/("freewater{}{}".format(acq, run))
+            if not fw_target.exists():
+                os.makedirs(fw_target)
+
+            #setup the inputs dictionary and outputs list
+            self.inputs_dict[self.count] = {
+                'pq_dwi_dir': {'src_path': pqdir/'PREPROCESSED', 'targ_name': '', 'directory': True}
+            }
+            self.outputs[self.count] = []
+
+            #start the script generation
+            self.start_script_generation(session_input, session_output, deriv_output_dir=fw_target)
 
 #for Kurt: DTI + Tractseg on preprocessed data
 class DWI_plus_TractsegGenerator(ScriptGenerator):
