@@ -1764,6 +1764,24 @@ class EVE3WMAtlasGenerator(ScriptGenerator):
         script.write("echo Running EVE3 registration...\n")
         script.write("singularity run -e -B {}:/INPUTS -B {}:/OUTPUTS {} --EVE3\n".format(session_input, session_output, self.setup.simg))
         script.write("echo Finished running EVE3 registration. Now removing inputs and copying outputs back...\n")
+
+        script.write("echo Checking if any values are greater than 1500...\n")
+        script.write("if awk '{for (i = 1; i <= NF; i++) if ($i > 1500) {exit 0}}' {}; then\n".format(str(session_input/'dwmri.bval')))
+        script.write("    echo 'At least one value is greater than 1500'\n")
+        script.write("else\n")
+        script.write("    echo 'No values greater than 1500 found. Removing firstshell nifti...'\n")
+        script.write("    rm {}\n".format(str(session_output/'dwmri%firstshell.nii.gz')))
+        script.write("fi\n")
+        # Check if any value in the file is greater than 1500
+        # if awk '{for (i = 1; i <= NF; i++) if ($i > 1500) {exit 0}}' file.txt; then
+        # echo "At least one value is greater than 1500"
+        # else
+        # echo "No values greater than 1500 found"
+        # # Remove the file if no values are greater than 1500
+        # rm -f dwmri%firstshell.nii.gz
+        # fi
+
+
         #add a check to see if dwmri and dwmri%firstshell are the same. Delete if they are
 
     def generate_EVE3WMAtlas_scripts(self):
@@ -1853,7 +1871,16 @@ class MNI152WMAtlasGenerator(ScriptGenerator):
         script.write("echo Running MNI152 registration...\n")
         script.write("singularity run -e -B {}:/INPUTS -B {}:/OUTPUTS {} --MNI\n".format(session_input, session_output, self.setup.simg))
         script.write("echo Finished running MNI152 registration. Now removing inputs and copying outputs back...\n")
-        #add a check to see if dwmri and dwmri%firstshell are the same. Delete if they are
+        #always remove for MNI registration
+        script.write("rm {}\n".format(str(session_output/'dwmri%firstshell.nii.gz')))
+        
+        #script.write("echo Checking if any values are greater than 1500...\n")
+        #script.write("if awk '{for (i = 1; i <= NF; i++) if ($i > 1500) {exit 0}}' {}; then\n".format(str(session_input/'dwmri.bval')))
+        #script.write("    echo 'At least one value is greater than 1500'\n")
+        #script.write("else\n")
+        #script.write("    echo 'No values greater than 1500 found. Removing firstshell nifti...'\n")
+        #script.write("    rm {}\n".format(str(session_output/'dwmri%firstshell.nii.gz')))
+        #script.write("fi\n")
 
     def generate_MNI152WMAtlas_scripts(self):
         """
