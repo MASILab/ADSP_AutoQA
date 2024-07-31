@@ -599,13 +599,13 @@ class ScriptGenerator:
         
         if similar:
             sub, ses, acq, run = self.get_BIDS_fields_dwi(dwis[0])
-            PQdir = self.setup.dataset_derivs / 'derivatives' / sub / ses / 'PreQual'
+            PQdir = self.setup.dataset_derivs  / sub / ses / 'PreQual'
             return [PQdir]
         else:
             PQdirs = []
             for dwi in dwis:
                 sub, ses, acq, run = self.get_BIDS_fields_dwi(dwi)
-                PQdir = self.setup.dataset_derivs / 'derivatives' / sub / ses / 'PreQual{}{}'.format(acq, run)
+                PQdir = self.setup.dataset_derivs / sub / ses / 'PreQual{}{}'.format(acq, run)
                 PQdirs.append(PQdir)
             return PQdirs
     
@@ -1275,6 +1275,9 @@ class PreQualGenerator(ScriptGenerator):
                 PQdirs = self.get_PreQual_dirs_from_dwi(dwis, similar=False)
 
             #for each of the potential PreQuals, check to see if the outputs already exist
+            # for x in PQdirs:
+            #     if not all(self.check_PQ_outputs(x)):
+            #         print(x)
             needPQdirs = [x for x in PQdirs if not all(self.check_PQ_outputs(x))]
             #get the dwis and jsons that correspond to the PQdirs
             idxs = [PQdirs.index(x) for x in needPQdirs]
@@ -1295,10 +1298,12 @@ class PreQualGenerator(ScriptGenerator):
 
             #now, for the PQdirs that need to be run, generate the scripts
             for dir_num,pqdir in enumerate(needPQdirs):
+
                 #self.inputs_dict = {self.count: #dwis, T1}
                 acq, run = self.get_BIDS_fields_from_PQdir(pqdir)
                 #get the PE direction for each of the scans
                 if not similar: #RUN dwis SEPARATELY
+
                     if need_json_dicts is None: #we dont know, so just set to None
                         PEaxis, PEsign, PEunknown = None, None, None
                     else:
