@@ -587,7 +587,7 @@ class ScriptGenerator:
         files = result.strip().splitlines()
         return files
 
-    def find_prequal_dirs(self):
+    def get_PreQual_dirs(self):
         """
         Returns a list of all the PreQual directories in the dataset
         """
@@ -636,7 +636,7 @@ class ScriptGenerator:
 
     def get_BIDS_fields_t1(self, t1_path):
         pattern = r'(sub-\w+)(?:_(ses-\w+))?(?:_(acq-\w+))?(?:_(run-\d{1,2}))?_T1w'
-        matches = re.findall(pattern, t1_path)
+        matches = re.findall(pattern, str(t1_path).split('/')[-1])
         sub, ses, acq, run = matches[0][0], matches[0][1], matches[0][2], matches[0][3]
         return sub, ses, acq, run
 
@@ -874,7 +874,7 @@ class ScriptGenerator:
         unest_seg = unest_dir/("{}{}{}{}_T1w_seg_merged_braincolor.nii.gz".format(sub,ses,acq,run))
         return unest_seg
 
-    def get_BIDS_fields_from_PQdir(self, PQdir):
+    def get_BIDS_acq_run_from_PQdir(self, PQdir):
         """
         Given a PreQual directory, return the acq, run BIDS fields 
         """
@@ -889,6 +889,20 @@ class ScriptGenerator:
         else:
             acq = ''
         return acq, run
+
+    def get_BIDS_fields_from_PQdir(self, pqdir):
+        """
+        Given a PreQual directory, return the BIDS fields
+        """
+        #get the sub, ses from the directory
+        if pqdir.parent.parent.name == 'derivatives':
+            sub = pqdir.parent.name
+            ses = ''
+        else:
+            sub = pqdir.parent.parent.name
+            ses = pqdir.parent.name
+        acq, run = self.get_BIDS_acq_run_from_PQdir(pqdir)
+        return sub, ses, acq, run
 
     def add_to_missing(self, sub, ses, acq, run, reason):
         """
@@ -1010,17 +1024,20 @@ class ScriptGenerator:
             targ_dir: remote directory
             """
 
-            content="src_dir={output_dir}; declare -A local_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\"; key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); local_dict[\"$key\"]=\"$value\"; done < <(find $src_dir -type f -exec md5sum {{}} +)\n".format(output_dir=input)
+            #this will get the mdm5sum of all the files in the source directory
+            content="src_dir={output_dir}; declare -A local_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\"; key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); local_dict[\"$key\"]=\"$value\"; done < <(find $src_dir \( -type f -o -type l \) -exec md5sum {{}} +)\n".format(output_dir=input)
             script.write(content)
             #script.write('declare -A local_dict && while read -r value key; do local_dict[${{key}}]=$value; done <<< "$(md5sum {}/*)"'.format(input))
+            #this will get the mdm5sum of all the files in the target directory
             if not self.setup.args.no_scp: #another /* here?
-                content="src_dir={output_dir}; declare -A targ_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\";key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); targ_dict[\"$key\"]=\"$value\"; done < <(ssh {ID}@{server} \"find ${{src_dir}} -type f -exec md5sum {{}} +\")\n".format(ID=self.setup.vunetID, server=self.setup.args.src_server, output_dir=targ_dir)
+                content="src_dir={output_dir}; declare -A targ_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\";key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); targ_dict[\"$key\"]=\"$value\"; done < <(ssh {ID}@{server} \"find ${{src_dir}} \( -type f -o -type l \) -exec md5sum {{}} +\")\n".format(ID=self.setup.vunetID, server=self.setup.args.src_server, output_dir=targ_dir)
                 #script.write('declare -A targ_dict && while read -r value key; do targ_dict[${{key}}]=$value; done <<< "$(ssh {}@{} \"md5sum {}\")"'.format(self.setup.vunetID, self.setup.args.src_server, targ_dir))
                 script.write(content)
             else:
-                content="src_dir={output_dir}; declare -A targ_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\"; key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); targ_dict[\"$key\"]=\"$value\"; done < <(find $src_dir -type f -exec md5sum {{}} +)\n".format(output_dir=targ_dir)
+                content="src_dir={output_dir}; declare -A targ_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\"; key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); targ_dict[\"$key\"]=\"$value\"; done < <(find $src_dir \( -type f -o -type l \) -exec md5sum {{}} +)\n".format(output_dir=targ_dir)
                 script.write(content)
                 #script.write('declare -A targ_dict && while read -r value key; do targ_dict[${{key}}]=$value; done <<< "$(md5sum {}/*)"'.format(targ_dir))
+            #this will loop through all the keys in the source directory, and check if the md5sums match between the corresponding files
             script.write('for key in "${!local_dict[@]}"; do\n')
             script.write('    if [ "${local_dict[$key]}" != "${targ_dict[$key]}" ]; then\n')
             script.write('        echo "PROVENANCE FAIL: Files $key do not match"; echo local: ${local_dict[$key]}; echo target: ${targ_dict[$key]}; exit 1\n')
@@ -1061,11 +1078,15 @@ class ScriptGenerator:
                         targ_file = input['separate_input']/input['targ_name']
                     else:
                         targ_file = session_input/input['targ_name']
-                    if 'directory' in input:
-                        targ_file = targ_file / '*' #for copying contents of the directory (e.g. PreQual/PREPROCESSED)
                     input_targets[key] = targ_file
-                    write_copy_to_input_line(self, script, input['src_path'], targ_file)
-                    write_ssh_provenance_check(self, script, input['src_path'], targ_file)
+                    if 'directory' in input:
+                        #input['src_path'] = input['src_path'] / '*' #for copying contents of the directory (e.g. PreQual/PREPROCESSED)
+                        #targ_file = targ_file / '*' 
+                        write_copy_to_input_line(self, script, input['src_path']/'*', targ_file)
+                        write_ssh_provenance_check_directory(self, script, input['src_path'], targ_file)
+                    else:
+                        write_copy_to_input_line(self, script, input['src_path'], targ_file)
+                        write_ssh_provenance_check(self, script, input['src_path'], targ_file)
                 else: #this is also a dict
                     try:
                         targ_file = session_input/input.name #alter name here if necessary
@@ -1336,7 +1357,7 @@ class PreQualGenerator(ScriptGenerator):
             for dir_num,pqdir in enumerate(needPQdirs):
 
                 #self.inputs_dict = {self.count: #dwis, T1}
-                acq, run = self.get_BIDS_fields_from_PQdir(pqdir)
+                acq, run = self.get_BIDS_acq_run_from_PQdir(pqdir)
                 #get the PE direction for each of the scans
                 if not similar: #RUN dwis SEPARATELY
 
@@ -1766,7 +1787,7 @@ class EVE3WMAtlasGenerator(ScriptGenerator):
         script.write("echo Finished running EVE3 registration. Now removing inputs and copying outputs back...\n")
 
         script.write("echo Checking if any values are greater than 1500...\n")
-        script.write("if awk '{for (i = 1; i <= NF; i++) if ($i > 1500) {exit 0}}' {}; then\n".format(str(session_input/'dwmri.bval')))
+        script.write("if awk '{{for (i = 1; i <= NF; i++) if ($i > 1500) {{exit 0}}}}' {}; then\n".format(str(session_input/'dwmri.bval')))
         script.write("    echo 'At least one value is greater than 1500'\n")
         script.write("else\n")
         script.write("    echo 'No values greater than 1500 found. Removing firstshell nifti...'\n")
@@ -1810,7 +1831,7 @@ class EVE3WMAtlasGenerator(ScriptGenerator):
             t1 = self.get_prov_t1(pqdir)
             if not t1:
                 #get the T1 using the function, and print out a provenance warning
-                print("Warning: Could not get provenance T1 for {}/{}/{}".format(sub,ses,pqdir))
+                print("Warning: Could not get provenance T1 for {}".format(pqdir))
                 t1 = self.get_t1(self.setup.root_dataset_path/(sub)/(ses)/("anat"), sub, ses)
                 if not t1:
                     self.add_to_missing(sub, ses, acq, run, 'T1')
@@ -1818,12 +1839,12 @@ class EVE3WMAtlasGenerator(ScriptGenerator):
             
             #based on the T1, get the TICV/UNest segmentation
             ses_deriv = pqdir.parent
-            if not self.args.use_unest_seg:
+            if not self.setup.args.use_unest_seg:
                 seg = self.get_TICV_seg_file(t1, ses_deriv)
             else:
                 seg = self.get_UNest_seg_file(t1, ses_deriv)
             if not seg.exists():
-                self.add_to_missing(sub, ses, acq, run, 'TICV' if not self.args.use_unest_seg else 'UNest')
+                self.add_to_missing(sub, ses, acq, run, 'TICV' if not self.setup.args.use_unest_seg else 'UNest')
                 continue
 
             self.count += 1
@@ -1916,12 +1937,12 @@ class MNI152WMAtlasGenerator(ScriptGenerator):
             
             #based on the T1, get the TICV/UNest segmentation
             ses_deriv = pqdir.parent
-            if not self.args.use_unest_seg:
+            if not self.setup.args.use_unest_seg:
                 seg = self.get_TICV_seg_file(t1, ses_deriv)
             else:
                 seg = self.get_UNest_seg_file(t1, ses_deriv)
             if not seg.exists():
-                self.add_to_missing(sub, ses, acq, run, 'TICV' if not self.args.use_unest_seg else 'UNest')
+                self.add_to_missing(sub, ses, acq, run, 'TICV' if not self.setup.args.use_unest_seg else 'UNest')
                 continue
 
             self.count += 1
@@ -2003,7 +2024,7 @@ class MaCRUISEGenerator(ScriptGenerator):
                 seg_file = segdir/("post")/("FinalResult")/("{}{}{}{}_T1w_seg.nii.gz".format(sub, sesx, acqx, runx))
             
             if not segdir.exists() or not seg_file.exists():
-                row = {'sub':sub, 'ses':ses, 'acq':acq, 'run':run, 'missing':'TICV' if not self.args.use_unest_seg else 'UNest'}
+                row = {'sub':sub, 'ses':ses, 'acq':acq, 'run':run, 'missing':'TICV' if not self.setup.args.use_unest_seg else 'UNest'}
                 missing_data = pd.concat([missing_data, pd.Series(row).to_frame().T], ignore_index=True)
                 continue
 
@@ -2176,12 +2197,12 @@ class ConnectomeSpecialGenerator(ScriptGenerator):
             
             #based on the T1, get the TICV/UNest segmentation
             ses_deriv = pqdir.parent
-            if not self.args.use_unest_seg:
+            if not self.setup.args.use_unest_seg:
                 seg = self.get_TICV_seg_file(t1, ses_deriv)
             else:
                 seg = self.get_UNest_seg_file(t1, ses_deriv)
             if not seg.exists():
-                self.add_to_missing(sub, ses, acq, run, 'TICV' if not self.args.use_unest_seg else 'UNest')
+                self.add_to_missing(sub, ses, acq, run, 'TICV' if not self.setup.args.use_unest_seg else 'UNest')
                 continue
 
             #we also need the scalar maps
@@ -2461,12 +2482,12 @@ class FrancoisSpecialGenerator(ScriptGenerator):
             
             #based on the T1, get the TICV/UNest segmentation
             ses_deriv = pqdir.parent
-            if not self.args.use_unest_seg:
+            if not self.setup.args.use_unest_seg:
                 seg = self.get_TICV_seg_file(t1, ses_deriv)
             else:
                 seg = self.get_UNest_seg_file(t1, ses_deriv)
             if not seg.exists():
-                self.add_to_missing(sub, ses, acq, run, 'TICV' if not self.args.use_unest_seg else 'UNest')
+                self.add_to_missing(sub, ses, acq, run, 'TICV' if not self.setup.args.use_unest_seg else 'UNest')
                 continue
 
             #need to get the orignal DWI(s) to check for the number of shells and bvals
@@ -2633,7 +2654,7 @@ class NODDIGenerator(ScriptGenerator):
             #start the script generation
             self.start_script_generation(session_input, session_output, deriv_output_dir=noddi_target, dwi_mask=dwi_mask)
 
-class freewaterGenerator(ScriptGenerator):
+class FreewaterGenerator(ScriptGenerator):
     """
     Class for generating freewater scripts
     """
