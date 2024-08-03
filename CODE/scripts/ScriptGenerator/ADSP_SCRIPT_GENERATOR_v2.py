@@ -1252,7 +1252,7 @@ class PreQualGenerator(ScriptGenerator):
         if self.setup.args.dataset_name == "HCPA" or self.setup.args.dataset_name == "HCPD" or self.setup.args.dataset_name == "HCP":
             #we want to turn off all PREPROCESSING steps possible
             opts = '--denoise off'
-        elif self.setup.args.dataset_name == "OASIS3":
+        elif self.setup.args.dataset_name == "OASIS3" or self.setup.args.dataset_name == "IBIS":
             #we need the threshold for bvalues (as this is the weird bvalue acquisition)
             opts = '--bval_threshold 51 --eddy_bval_scale 2 --topup_first_b0s_only'
         else:
@@ -1326,6 +1326,7 @@ class PreQualGenerator(ScriptGenerator):
 
             if similar and not self.setup.args.separate_prequal:
                 #if similar, run them together
+                #print("Running PreQuals together for {}_{}".format(sub, ses))
                 PQdirs = self.get_PreQual_dirs_from_dwi(dwis, similar=True)
             else:
                 #if dissimilar, run them separately
@@ -1354,12 +1355,14 @@ class PreQualGenerator(ScriptGenerator):
                 continue
 
             #now, for the PQdirs that need to be run, generate the scripts
+            #print(needPQdirs)
+            #print(need_dwis)
             for dir_num,pqdir in enumerate(needPQdirs):
 
                 #self.inputs_dict = {self.count: #dwis, T1}
                 acq, run = self.get_BIDS_acq_run_from_PQdir(pqdir)
                 #get the PE direction for each of the scans
-                if not similar: #RUN dwis SEPARATELY
+                if not similar or self.setup.args.separate_prequal: #RUN dwis SEPARATELY
 
                     if need_json_dicts is None: #we dont know, so just set to None
                         PEaxis, PEsign, PEunknown = None, None, None
@@ -1383,6 +1386,8 @@ class PreQualGenerator(ScriptGenerator):
                     #setup the inputs dicitonary
                     self.inputs_dict[self.count] = {'dwi': need_dwis[dir_num], 'bval': need_bvals[dir_num],
                                                     'bvec': need_bvecs[dir_num], 't1': {'src_path':t1, 'targ_name': 't1.nii.gz'}}
+                    #if run != '':
+                    #    print(self.inputs_dict[self.count])
                     self.outputs[self.count] = []
 
                     #create the final output directories
@@ -1400,6 +1405,8 @@ class PreQualGenerator(ScriptGenerator):
                     ##TODO##
 
                 else: #run dwis TOGETHER
+                    print('******************************************************')
+                    print("Running PreQuals together for {}_{}".format(sub, ses))
                     (PEaxes, PEsigns, PEunknowns) = get_PE_dirs(json_dicts, jsons, single=False) #returns a tuple of tuples
                         #make sure, for new VMAP, that the PEdirection is negative for the acq-ReversePE
                     #determine if it needs a T1 or not
