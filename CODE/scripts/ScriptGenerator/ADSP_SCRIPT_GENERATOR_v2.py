@@ -548,8 +548,8 @@ class ScriptGenerator:
                 "CONNECTOME_NUMSTREAM.npy", "CONNECTOME_LENGTH.npy", "CONNECTOME_FA.npy", "b0.nii.gz", "atlas_slant_subj.nii.gz"
             ],
             'tractseg': [
-                {'targ_name': 'bundles'},
-                {'targ_name': 'measures'}
+                #{'targ_name': 'bundles'},
+                #{'targ_name': 'measures'}
             ],
             'NODDI': [
                 'config.pickle',
@@ -1025,17 +1025,28 @@ class ScriptGenerator:
             """
 
             #this will get the mdm5sum of all the files in the source directory
-            content="src_dir={output_dir}; declare -A local_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\"; key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); local_dict[\"$key\"]=\"$value\"; done < <(find $src_dir \( -type f -o -type l \) -exec md5sum {{}} +)\n".format(output_dir=input)
-            script.write(content)
-            #script.write('declare -A local_dict && while read -r value key; do local_dict[${{key}}]=$value; done <<< "$(md5sum {}/*)"'.format(input))
-            #this will get the mdm5sum of all the files in the target directory
             if not self.setup.args.no_scp: #another /* here?
-                content="src_dir={output_dir}; declare -A targ_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\";key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); targ_dict[\"$key\"]=\"$value\"; done < <(ssh {ID}@{server} \"find ${{src_dir}} \( -type f -o -type l \) -exec md5sum {{}} +\")\n".format(ID=self.setup.vunetID, server=self.setup.args.src_server, output_dir=targ_dir)
-                #script.write('declare -A targ_dict && while read -r value key; do targ_dict[${{key}}]=$value; done <<< "$(ssh {}@{} \"md5sum {}\")"'.format(self.setup.vunetID, self.setup.args.src_server, targ_dir))
+                content="src_dir={output_dir}; declare -A local_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\"; key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); local_dict[\"$key\"]=\"$value\"; done < <(ssh {ID}@{server} \"find ${{src_dir}} \( -type f -o -type l \) -exec md5sum {{}} +\")\n".format(output_dir=input)
                 script.write(content)
             else:
-                content="src_dir={output_dir}; declare -A targ_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\"; key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); targ_dict[\"$key\"]=\"$value\"; done < <(find $src_dir \( -type f -o -type l \) -exec md5sum {{}} +)\n".format(output_dir=targ_dir)
+                content="src_dir={output_dir}; declare -A local_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\"; key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); local_dict[\"$key\"]=\"$value\"; done < <(find $src_dir \( -type f -o -type l \) -exec md5sum {{}} +)\n".format(output_dir=input)
                 script.write(content)
+            #this will get the mdm5sum of all the files in the target directory (i.e. the one on the computation node input)
+            content="src_dir={output_dir}; declare -A targ_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\"; key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); targ_dict[\"$key\"]=\"$value\"; done < <(find $src_dir \( -type f -o -type l \) -exec md5sum {{}} +)\n".format(output_dir=targ_dir)
+            script.write(content)
+            ####
+
+            # content="src_dir={output_dir}; declare -A local_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\"; key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); local_dict[\"$key\"]=\"$value\"; done < <(find $src_dir \( -type f -o -type l \) -exec md5sum {{}} +)\n".format(output_dir=input)
+            # script.write(content)
+            # #script.write('declare -A local_dict && while read -r value key; do local_dict[${{key}}]=$value; done <<< "$(md5sum {}/*)"'.format(input))
+            # #this will get the mdm5sum of all the files in the target directory
+            # if not self.setup.args.no_scp: #another /* here?
+            #     content="src_dir={output_dir}; declare -A targ_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\";key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); targ_dict[\"$key\"]=\"$value\"; done < <(ssh {ID}@{server} \"find ${{src_dir}} \( -type f -o -type l \) -exec md5sum {{}} +\")\n".format(ID=self.setup.vunetID, server=self.setup.args.src_server, output_dir=targ_dir)
+            #     #script.write('declare -A targ_dict && while read -r value key; do targ_dict[${{key}}]=$value; done <<< "$(ssh {}@{} \"md5sum {}\")"'.format(self.setup.vunetID, self.setup.args.src_server, targ_dir))
+            #     script.write(content)
+            # else:
+            #     content="src_dir={output_dir}; declare -A targ_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\"; key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); targ_dict[\"$key\"]=\"$value\"; done < <(find $src_dir \( -type f -o -type l \) -exec md5sum {{}} +)\n".format(output_dir=targ_dir)
+            #     script.write(content)
                 #script.write('declare -A targ_dict && while read -r value key; do targ_dict[${{key}}]=$value; done <<< "$(md5sum {}/*)"'.format(targ_dir))
             #this will loop through all the keys in the source directory, and check if the md5sums match between the corresponding files
             script.write('for key in "${!local_dict[@]}"; do\n')
@@ -1292,6 +1303,9 @@ class PreQualGenerator(ScriptGenerator):
             self.warnings[self.count] += "Warning: Could not read readout times from json files. Assuming 0.05 for all scans.\n"
         self.config[self.count] = pd.DataFrame(columns=['dwi', 'sign', 'readout'])
         for dwi, sign, readout in zip(dwis, PEsigns, readout_times):
+            if readout == None:
+                self.warnings[self.count] += "Warning: Could not read readout times from json files. Assuming 0.05 for all scans.\n"
+                readout = 0.05
             row = {'dwi': dwi, 'sign': sign, 'readout': readout}
             self.config[self.count] = pd.concat([self.config[self.count], pd.Series(row).to_frame().T], ignore_index=True)
 
@@ -2383,16 +2397,17 @@ class TractsegGenerator(ScriptGenerator):
             tensor_maps = [eve3dir/("dwmri%{}.nii.gz".format(m)) for m in ['fa', 'md', 'ad', 'rd']]
             using_PQ = False
             if not all([t.exists() for t in tensor_maps]):
-                row = {'sub':sub, 'ses':ses, 'acq':acq, 'run':run, 'missing':'tensor_maps'}
-                missing_data = pd.concat([missing_data, pd.Series(row).to_frame().T], ignore_index=True)
+                #row = {'sub':sub, 'ses':ses, 'acq':acq, 'run':run, 'missing':'tensor_maps'}
+                #missing_data = pd.concat([missing_data, pd.Series(row).to_frame().T], ignore_index=True)
+                self.add_to_missing(sub, ses, acq, run, 'tensor_maps')
                 continue
 
             self.count += 1
 
             #create the temp session directories
             session_temp = root_temp/(sub)/("{}{}{}".format(ses,acq,run))
-            (session_input, session_output) = self.make_session_dirs(sub, ses, acq, run, tmp_input_dir=self.setup.tmp_input_dir,
-                                            tmp_output_dir=self.setup.tmp_output_dir, temp_dir=session_temp, has_temp=True)
+            (session_input, session_output, session_temp) = self.make_session_dirs(sub, ses, acq, run, tmp_input_dir=self.setup.tmp_input_dir,
+                                            tmp_output_dir=self.setup.tmp_output_dir, temp_dir=root_temp, has_temp=True)
 
             #create the target output directory
             tractseg_target = self.setup.output_dir/(sub)/(ses)/("Tractseg{}{}".format(acq, run))
@@ -3100,7 +3115,7 @@ def get_readout_times(json_dicts):
             try:
                 readout = json_data['EstimatedTotalReadoutTime']
             except:
-                readout = None
+                readout = None #default to 0.05 if not found
         readouts.append(readout)
     return readouts
 
