@@ -1026,7 +1026,7 @@ class ScriptGenerator:
 
             #this will get the mdm5sum of all the files in the source directory
             if not self.setup.args.no_scp: #another /* here?
-                content="src_dir={output_dir}; declare -A local_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\"; key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); local_dict[\"$key\"]=\"$value\"; done < <(ssh {ID}@{server} \"find ${{src_dir}} \( -type f -o -type l \) -exec md5sum {{}} +\")\n".format(output_dir=input)
+                content="src_dir={output_dir}; declare -A local_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\"; key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); local_dict[\"$key\"]=\"$value\"; done < <(ssh {ID}@{server} \"find ${{src_dir}} \( -type f -o -type l \) -exec md5sum {{}} +\")\n".format(ID=self.setup.vunetID, server=self.setup.args.src_server, output_dir=input)
                 script.write(content)
             else:
                 content="src_dir={output_dir}; declare -A local_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\"; key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); local_dict[\"$key\"]=\"$value\"; done < <(find $src_dir \( -type f -o -type l \) -exec md5sum {{}} +)\n".format(output_dir=input)
@@ -2513,7 +2513,7 @@ class FrancoisSpecialGenerator(ScriptGenerator):
                 continue
 
             #need to get the orignal DWI(s) to check for the number of shells and bvals
-            og_dwis = self.get_prov_dwis(pqdir)
+            og_dwis = self.get_prov_dwi(pqdir)
             if not og_dwis:
                 #no provenance DWIs found
                 assert False, "Error: No provenance DWIs found for {}/{}/{}".format(sub, ses, pqdir)
@@ -2569,8 +2569,8 @@ class FrancoisSpecialGenerator(ScriptGenerator):
             self.outputs[self.count] = []
 
             #start the script generation
-            self.start_script_generation(session_input, session_output, deriv_output_dir=fs_target, shdegree=sh_degree,
-                                         sub=sub, ses=ses)
+            self.start_script_generation(session_input, session_output, deriv_output_dir=fs_target, sh_degree=sh_degree,
+                                         dti_shells=dti_shells, fodf_shells=fodf_shells, sub=sub, ses=ses)
             
             ### TODO: Add the shdegree to the config.yml file
 
@@ -2962,6 +2962,8 @@ def get_shells_and_dirs(PQdir, bval_files, bvec_files):
             return base*np.floor(d)
         
     def load_bvals_bvecs(bval_files, bvec_files):
+        bvals = []
+        bvecs = []
         for bval_f, bvec_f in zip(bval_files, bvec_files):
             bval = np.loadtxt(bval_f)
             bvec = np.loadtxt(bvec_f)
