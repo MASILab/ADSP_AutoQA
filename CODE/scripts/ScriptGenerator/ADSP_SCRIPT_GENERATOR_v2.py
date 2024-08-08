@@ -65,6 +65,8 @@ def pa():
     p.add_argument('--src_server', type=str, default='landman01.accre.vanderbilt.edu', help="Source server for scp")
     p.add_argument('--separate_prequal', action='store_true', help="If you want to run all DWI separately through PreQual, regardless of whether the can be run together")
     p.add_argument('--custom_home', default='', type=str, help="Path to the custom home directory for the user if --no_accre is set (for Tractseg)")
+    p.add_argument('--TE_tolerance_PQ', default=0.01, type=float, help="Tolerance for TE differences in determining scan similarity for PreQual")
+    p.add_argument('--TR_tolerance_PQ', default=0.01, type=float, help="Tolerance for TR differences in determining scan similarity for PreQual")
     return p.parse_args()
 
 class ScriptGeneratorSetup:
@@ -1187,7 +1189,22 @@ class ScriptGenerator:
                         data[key] = convert_dict_paths_to_string(value)
                     elif isinstance(value, Path):
                         data[key] = str(value)
+                    elif isinstance(value, list): #this is now correct for the input paths, but wrong for the PreQual config
+                        data[key] = [str(x) if isinstance(x, Path) else x for x in value]
             return data
+        
+        def combine_PQ_config(data):
+            """
+            Given a list of PreQual config dictionaries, combine them into a single dictionary and turn Path objs into strings
+            """
+            PQconfig = {'dwi': [], 'sign': [], 'readout': []}
+            for subdict in data:
+                for key, value in subdict.items():
+                    if isinstance(value, Path):
+                        value = str(value)
+                    PQconfig[key].append(value)
+            return PQconfig
+
 
         config_yml_name = "pipeline_config.yml"
 
@@ -1201,7 +1218,8 @@ class ScriptGenerator:
 
         if self.setup.args.pipeline == 'PreQual':
             #print(convert_dict_paths_to_string(self.config[self.count].to_dict(orient='records')))
-            config_yml['config'] = convert_dict_paths_to_string(self.config[self.count].to_dict(orient='records')[0])
+            #print(self.config[self.count].to_dict(orient='records'))
+            config_yml['config'] = combine_PQ_config(self.config[self.count].to_dict(orient='records'))
             config_yml['warnings'] = self.warnings[self.count]
 
         #with open(deriv_output/'config.yml', 'w') as yml:
@@ -1275,7 +1293,7 @@ class PreQualGenerator(ScriptGenerator):
         #with open(config_f, 'w') as config:
         script.write("echo Writing dtiQA_config.csv\n")
         for idx, row in self.config[self.count].iterrows():
-            script.write("echo {},{},{} > {}\n".format(row['dwi'].name.split('.nii.gz')[0], row['sign'], row['readout'], config_f))
+            script.write("echo {},{},{} >> {}\n".format(row['dwi'].name.split('.nii.gz')[0], row['sign'], row['readout'], config_f))
         
         #write all the warnings
         script.write("echo '*** WARNINGS ***'\n")
@@ -1308,6 +1326,10 @@ class PreQualGenerator(ScriptGenerator):
                 readout = 0.05
             row = {'dwi': dwi, 'sign': sign, 'readout': readout}
             self.config[self.count] = pd.concat([self.config[self.count], pd.Series(row).to_frame().T], ignore_index=True)
+        # print(self.config[self.count])
+        # print(dwis)
+        # print(PEsigns)
+        # print(readout_times)
 
     def generate_prequal_scripts(self):
         """
@@ -1333,7 +1355,7 @@ class PreQualGenerator(ScriptGenerator):
             #check to see if the jsons have the same acquisition parameters or not (within a small margin)
             try:
                 json_dicts = [get_json_dict(x) for x in jsons]
-                similar = check_json_params_similarity(json_dicts)
+                similar = check_json_params_similarity(json_dicts, self.setup.args)
             except:
                 similar = False
                 print("Error: Could not read json files {}. Assuming different acquisitions.".format(jsons))
@@ -1352,14 +1374,25 @@ class PreQualGenerator(ScriptGenerator):
             #         print(x)
             needPQdirs = [x for x in PQdirs if not all(self.check_PQ_outputs(x))]
             #get the dwis and jsons that correspond to the PQdirs
-            idxs = [PQdirs.index(x) for x in needPQdirs]
-            need_dwis = [dwis[i] for i in idxs]
-            need_bvals = [bvals[i] for i in idxs]
-            need_bvecs = [bvecs[i] for i in idxs]
-            need_jsons = [jsons[i] for i in idxs]
+            if not similar or self.setup.args.separate_prequal: #if running separately, then only use the ones that need to be run
+                idxs = [PQdirs.index(x) for x in needPQdirs]
+                need_dwis = [dwis[i] for i in idxs]
+                need_bvals = [bvals[i] for i in idxs]
+                need_bvecs = [bvecs[i] for i in idxs]
+                need_jsons = [jsons[i] for i in idxs]
+            else: #if running together, then use them all
+                need_dwis = dwis
+                need_bvals = bvals
+                need_bvecs = bvecs
+                need_jsons = jsons
             try:
-                need_json_dicts = [json_dicts[i] for i in idxs]
+                if not similar or self.setup.args.separate_prequal:
+                    #idxs = [PQdirs.index(x) for x in needPQdirs]
+                    need_json_dicts = [json_dicts[i] for i in idxs]
+                else:
+                    need_json_dicts = json_dicts
                 readout_times = get_readout_times(need_json_dicts)
+                #print("Readout Times:", readout_times)
             except:
                 need_json_dicts = None
                 readout_times = None
@@ -3117,6 +3150,8 @@ def get_readout_times(json_dicts):
     Given json dictionaries, get the readout times
     """
     readouts = []
+    #print("getting readouts........")
+    #print(json_dicts)
     for json_data in json_dicts:
         try:
             readout = json_data['TotalReadoutTime']
@@ -3126,6 +3161,8 @@ def get_readout_times(json_dicts):
             except:
                 readout = None #default to 0.05 if not found
         readouts.append(readout)
+        #print(readout)
+    #print(readouts)
     return readouts
 
 def check_needs_synb0(PEaxes, PEsigns, PEunknows):
@@ -3229,7 +3266,7 @@ def get_json_dict(json_file):
         #print(contents)
         return contents
 
-def check_json_params_similarity(dicts):
+def check_json_params_similarity(dicts, args):
     """
     Returns True if all the json files have the same acquisition parameters, False otherwise
     """
@@ -3237,11 +3274,11 @@ def check_json_params_similarity(dicts):
         return False #do not create blanket "PreQual". Instead, run the pipeline on the individual files (of which we have only 1)
 
     #compare the dicts
-    similar = compare_json_dicts(dicts)
+    similar = compare_json_dicts(dicts, args)
 
     return similar
 
-def compare_json_dicts(dicts):
+def compare_json_dicts(dicts, args):
     """
     Given a list of json dictionaries for Niftis, compare them to see if they are similar or not
     """
@@ -3256,7 +3293,7 @@ def compare_json_dicts(dicts):
         #Magnetic Field Strength: make sure they are the same
         mfs = np.array([x['MagneticFieldStrength'] for x in dicts])
 
-        return check_within_tolerance(tes) and check_within_tolerance(trs) and check_identical(mfs)
+        return check_within_tolerance(tes, tolerance=args.TE_tolerance_PQ) and check_within_tolerance(trs, tolerance=args.TR_tolerance_PQ) and check_identical(mfs)
 
     except:
         return False
