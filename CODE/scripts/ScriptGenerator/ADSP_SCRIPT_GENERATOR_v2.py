@@ -997,9 +997,9 @@ class ScriptGenerator:
                 #do not just copy back all outputs, but only the necessary ones
                 for targ_copy in kwargs['special_copy']:
                     if not self.setup.args.no_scp:
-                        script.write("scp -r {}/* {}@{}:{}/\n".format(session_output/targ_copy, self.setup.vunetID, self.setup.args.src_server, deriv_output))
+                        script.write("scp -r {} {}@{}:{}/\n".format(session_output/targ_copy, self.setup.vunetID, self.setup.args.src_server, deriv_output))
                     else:
-                        script.write("cp -r {}/* {}/\n".format(session_output/targ_copy, deriv_output))
+                        script.write("cp -r {} {}/\n".format(session_output/targ_copy, deriv_output))
 
         def write_ssh_provenance_check(self, script, input, targ_name):
             """
