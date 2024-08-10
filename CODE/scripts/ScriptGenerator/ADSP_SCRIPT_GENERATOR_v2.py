@@ -479,12 +479,12 @@ class ScriptGenerator:
         pass
         #raise NotImplementedError("Error: dwi_plus_tractseg_script_generate not implemented")
 
-    def generate_bedpostx_plus_dwi_plus_tractseg_scripts(self):
+    def bedpostx_plus_dwi_plus_tractseg_script_generate(self):
         """
         Abstract method to be implemented by the child class
         """
         pass
-        #raise NotImplementedError("Error: generate_bedpostx_plus_dwi_plus_tractseg_scripts not implemented")
+        #raise NotImplementedError("Error: bedpostx_plus_dwi_plus_tractseg_script_generate not implemented")
 
     ## END ABSTRACT CLASSES ##
 
