@@ -573,6 +573,7 @@ class ScriptGenerator:
             'freewater': [],
             'FrancoisSpecial': [],
             'DWI_plus_Tractseg': [],
+            'BedpostX_plus_Tractseg': [],
             'freesurfer': []
             ### TODO: add the necessary outputs for the other pipelines
                 #this cannot be static for all the outputs for all pipelines, only some of them
