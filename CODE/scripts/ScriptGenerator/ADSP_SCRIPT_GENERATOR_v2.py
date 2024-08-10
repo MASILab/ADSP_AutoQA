@@ -3096,6 +3096,7 @@ class BedpostX_plus_DWI_plus_TractsegGenerator(ScriptGenerator):
             script.write("source setup_accre_runtime_dir\n")
 
         tractsegdir = "{}/tractseg".format(kwargs['temp_dir'])
+        script.write("mkdir -p {}\n".format(tractsegdir))
  
         script.write("time singularity run -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir}\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg))
         script.write("time singularity run -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir} --output_type endings_segmentation\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg))
