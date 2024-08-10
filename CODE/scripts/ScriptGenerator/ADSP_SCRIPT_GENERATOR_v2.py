@@ -516,7 +516,8 @@ class ScriptGenerator:
             "Biscuit": self.biscuit_script_generate,
             'NODDI': self.noddi_script_generate,
             'freewater': self.freewater_script_generate,
-            "DWI_plus_Tractseg": self.dwi_plus_tractseg_script_generate
+            "DWI_plus_Tractseg": self.dwi_plus_tractseg_script_generate,
+            "BedpostX_plus_Tractseg": self.bedpostx_plus_dwi_plus_tractseg_script_generate
         }
 
         self.necessary_outputs = {
