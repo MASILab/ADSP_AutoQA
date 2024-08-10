@@ -1295,6 +1295,8 @@ class PreQualGenerator(ScriptGenerator):
         elif self.setup.args.dataset_name == "OASIS3" or self.setup.args.dataset_name == "IBIS":
             #we need the threshold for bvalues (as this is the weird bvalue acquisition)
             opts = '--bval_threshold 51 --eddy_bval_scale 2 --topup_first_b0s_only'
+        elif self.setup.args.dataset_name == "Humphreys":
+            opts = '--topup_first_b0s_only --eddy_bval_scale 4'
         else:
             opts = '--topup_first_b0s_only'
 
