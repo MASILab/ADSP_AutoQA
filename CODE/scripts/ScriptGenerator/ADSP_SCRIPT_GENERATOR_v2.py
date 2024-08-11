@@ -3079,7 +3079,7 @@ class BedpostX_plus_DWI_plus_TractsegGenerator(ScriptGenerator):
         script.write("ln -s {}/dwmri%firstshell.bval {}/bvals\n".format(dti_dir, bedpostinput))
 
         #create the bedpostX mask
-        script.write("time singularity exec -B {indir}:{indir} {mrtrix} dwiextract {indir}/data.nii.gz -fslgrad {indir}/bvecs {indir}/bvals - -bzero | mrmath - mean {indir}/b0.nii.gz -axis 3\n".format(indir=bedpostinput, mrtrix=dwi_simg))
+        script.write("time singularity exec -B {indir}:{indir} {mrtrix} bash -c \"dwiextract {indir}/data.nii.gz -fslgrad {indir}/bvecs {indir}/bvals - -bzero | mrmath - mean {indir}/b0.nii.gz -axis 3\"\n".format(indir=bedpostinput, mrtrix=dwi_simg))
         script.write("time singularity exec -B {indir}:{indir} {mrtrix} bet {indir}/b0.nii.gz {indir}/b0_masked -m -R -f .3\n".format(indir=bedpostinput, mrtrix=dwi_simg))
         script.write("rm {indir}/b0_masked.nii.gz\n".format(indir=bedpostinput))
         script.write("mv {indir}/b0_masked_mask.nii.gz {indir}/nodif_brain_mask.nii.gz\n".format(indir=bedpostinput))
