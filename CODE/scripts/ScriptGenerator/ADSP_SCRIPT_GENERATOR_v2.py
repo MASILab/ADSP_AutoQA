@@ -3055,16 +3055,16 @@ class BedpostX_plus_DWI_plus_TractsegGenerator(ScriptGenerator):
 
         script.write("echo Resampling to 1mm iso...\n")
         isodwi = "{}/dwmri_1mm_iso.nii.gz".format(dti_dir)
-        script.write("time singularity run -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, shellnii, isodwi))
+        script.write("time singularity run -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, shellnii, isodwi))
         #same for the fa, md, ad, rd
         faiso = "{}/dwmri_tensor_fa_1mm_iso.nii.gz".format(dti_dir)
         mdiso = "{}/dwmri_tensor_md_1mm_iso.nii.gz".format(dti_dir)
         adiso = "{}/dwmri_tensor_ad_1mm_iso.nii.gz".format(dti_dir)
         rdiso = "{}/dwmri_tensor_rd_1mm_iso.nii.gz".format(dti_dir)
-        script.write("time singularity run -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, mrtrix_simg, fa, faiso))
-        script.write("time singularity run -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, mrtrix_simg, md, mdiso))
-        script.write("time singularity run -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, mrtrix_simg, ad, adiso))
-        script.write("time singularity run -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, mrtrix_simg, rd, rdiso))
+        script.write("time singularity run -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, dwi_simg, fa, faiso))
+        script.write("time singularity run -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, dwi_simg, md, mdiso))
+        script.write("time singularity run -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, dwi_simg, ad, adiso))
+        script.write("time singularity run -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, dwi_simg, rd, rdiso))
 
         #now, we need to run bedpostX on the input data
         script.write("echo Running bedpostX...\n")
