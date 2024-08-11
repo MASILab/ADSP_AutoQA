@@ -3351,7 +3351,7 @@ def check_freesurfer_outputs(fs_dir):
         isDone = True
         with open(recon_log, 'r') as log:
             content = log.read()
-            if not "finished without error" in content:
+            if "finished without error" in content:
                 return True
                 #isDone = True
         #if isDone:
