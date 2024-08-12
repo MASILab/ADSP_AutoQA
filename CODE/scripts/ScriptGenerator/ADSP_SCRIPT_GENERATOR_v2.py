@@ -1557,7 +1557,7 @@ class FreeSurferGenerator(ScriptGenerator):
             sub, ses, acq, run = self.get_BIDS_fields_t1(t1)
 
             #check to see if the freesurfer outputs exist
-            fs_dir = self.setup.dataset_derivs / 'derivatives' / sub / ses / 'freesurfer{}{}'.format(acq, run)
+            fs_dir = self.setup.dataset_derivs/ sub / ses / 'freesurfer{}{}'.format(acq, run)
             if check_freesurfer_outputs(fs_dir):
                 continue
 
@@ -3349,6 +3349,7 @@ def check_freesurfer_outputs(fs_dir):
 
     recon_log = fs_dir/("freesurfer")/("scripts")/("recon-all.log")
     #first, check if directory and file exist
+
     if fs_dir.exists() and recon_log.exists():
         #now check the contents of the reconlog
         isDone = True
