@@ -1142,7 +1142,10 @@ class ScriptGenerator:
 
             #check the file transfer with a checksum
             script.write("echo Checking the provenance of the outputs...\n")
-            write_ssh_provenance_check_directory(self, script, session_output, kwargs['deriv_output_dir'])
+            if 'temp_is_output' in kwargs:
+                write_ssh_provenance_check_directory(self, script, kwargs['temp_dir'], kwargs['deriv_output_dir'])
+            else:
+                write_ssh_provenance_check_directory(self, script, session_output, kwargs['deriv_output_dir'])
             # for key_file in self.outputs[self.count] + self.necessary_outputs[self.setup.args.pipeline]:
             #     if type(key_file) == dict:
             #         #check the provenance of the directory
