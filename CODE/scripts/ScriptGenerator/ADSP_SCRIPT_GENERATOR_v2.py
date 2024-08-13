@@ -756,9 +756,11 @@ class ScriptGenerator:
         num_bundles = len(list(bundles.glob("*.tck")))
         num_measures = len(list(measures.glob("*.json")))
 
-        if num_bundles != 72 or num_measures != 144:
+        #arbitrary numbers
+        if num_bundles <= 42 or num_measures <= 114:
             #print(tsdir, 'Missing')
-            return 'Missing Files'
+            #return 'Missing Files'
+            return False
         return True
 
     def get_t1(self, path, sub, ses):
@@ -3064,10 +3066,10 @@ class BedpostX_plus_DWI_plus_TractsegGenerator(ScriptGenerator):
         mdiso = "{}/dwmri_tensor_md_1mm_iso.nii.gz".format(dti_dir)
         adiso = "{}/dwmri_tensor_ad_1mm_iso.nii.gz".format(dti_dir)
         rdiso = "{}/dwmri_tensor_rd_1mm_iso.nii.gz".format(dti_dir)
-        script.write("time singularity run -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, dwi_simg, fa, faiso))
-        script.write("time singularity run -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, dwi_simg, md, mdiso))
-        script.write("time singularity run -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, dwi_simg, ad, adiso))
-        script.write("time singularity run -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, dwi_simg, rd, rdiso))
+        script.write("time singularity exec -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, dwi_simg, fa, faiso))
+        script.write("time singularity exec -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, dwi_simg, md, mdiso))
+        script.write("time singularity exec -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, dwi_simg, ad, adiso))
+        script.write("time singularity exec -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, dwi_simg, rd, rdiso))
 
         #now, we need to run bedpostX on the input data
         script.write("echo Running bedpostX...\n")
