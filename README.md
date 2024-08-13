@@ -3,8 +3,9 @@ Automated QA for ADSP processing.
 Written by Michael Kim. 
 Email: michael.kim@vanderbilt.edu
 
-## NOTE:
-The app works best on a smaller monitor, as larger monitors tend to update the screen more slowly.
+## NOTES FOR USE:
+- The app works best on a smaller monitor, as larger monitors tend to update the screen more slowly.
+- If there is a directory with a large number of QA documents (e.g. ADNI with SLANT-TICVv1.2), it will take a while to pre-load images, so please be patient and try not to click outside of the web browser (it MIGHT crash otherwise)
 
 ## Features to add
 - Template for QA processes such as PreQual that are PDFs instead of singular PNGs. (Work with Nazirah to determine which pages of the PDFs are best for QA and what the format should be)
