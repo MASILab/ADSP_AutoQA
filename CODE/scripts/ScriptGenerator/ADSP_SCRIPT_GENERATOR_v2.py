@@ -1041,13 +1041,13 @@ class ScriptGenerator:
 
             #this will get the mdm5sum of all the files in the source directory
             if not self.setup.args.no_scp: #another /* here?
-                content="src_dir={output_dir}; declare -A targ_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\"; key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); local_dict[\"$key\"]=\"$value\"; done < <(ssh {ID}@{server} \"find ${{src_dir}} \( -type f -o -type l \) -exec md5sum {{}} +\")\n".format(ID=self.setup.vunetID, server=self.setup.args.src_server, output_dir=targ_dir)
+                content="src_dir={output_dir}; declare -A targ_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\"; key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); targ_dict[\"$key\"]=\"$value\"; done < <(ssh {ID}@{server} \"find ${{src_dir}} \( -type f -o -type l \) -exec md5sum {{}} +\")\n".format(ID=self.setup.vunetID, server=self.setup.args.src_server, output_dir=targ_dir)
                 script.write(content)
             else:
-                content="src_dir={output_dir}; declare -A targ_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\"; key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); local_dict[\"$key\"]=\"$value\"; done < <(find $src_dir \( -type f -o -type l \) -exec md5sum {{}} +)\n".format(output_dir=targ_dir)
+                content="src_dir={output_dir}; declare -A targ_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\"; key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); targ_dict[\"$key\"]=\"$value\"; done < <(find $src_dir \( -type f -o -type l \) -exec md5sum {{}} +)\n".format(output_dir=targ_dir)
                 script.write(content)
             #this will get the mdm5sum of all the files in the target directory (i.e. the one on the computation node input)
-            content="src_dir={output_dir}; declare -A local_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\"; key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); targ_dict[\"$key\"]=\"$value\"; done < <(find $src_dir \( -type f -o -type l \) -exec md5sum {{}} +)\n".format(output_dir=input)
+            content="src_dir={output_dir}; declare -A local_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\"; key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); local_dict[\"$key\"]=\"$value\"; done < <(find $src_dir \( -type f -o -type l \) -exec md5sum {{}} +)\n".format(output_dir=input)
             script.write(content)
             ####
 
@@ -3060,7 +3060,7 @@ class BedpostX_plus_DWI_plus_TractsegGenerator(ScriptGenerator):
 
         script.write("echo Resampling to 1mm iso...\n")
         isodwi = "{}/dwmri_1mm_iso.nii.gz".format(dti_dir)
-        script.write("time singularity run -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, shellnii, isodwi))
+        script.write("time singularity exec -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, shellnii, isodwi))
         #same for the fa, md, ad, rd
         faiso = "{}/dwmri_tensor_fa_1mm_iso.nii.gz".format(dti_dir)
         mdiso = "{}/dwmri_tensor_md_1mm_iso.nii.gz".format(dti_dir)
@@ -3079,7 +3079,7 @@ class BedpostX_plus_DWI_plus_TractsegGenerator(ScriptGenerator):
         script.write("mkdir -p {}\n".format(bedpostinput))
         
         #link the necessary files
-        script.write("ln -s {}/dwmri%firstshell.nii.gz {}/data.nii.gz\n".format(dti_dir, bedpostinput))
+        script.write("ln -s {} {}/data.nii.gz\n".format(isodwi, bedpostinput))
         script.write("ln -s {}/dwmri%firstshell.bvec {}/bvecs\n".format(dti_dir, bedpostinput))
         script.write("ln -s {}/dwmri%firstshell.bval {}/bvals\n".format(dti_dir, bedpostinput))
 
