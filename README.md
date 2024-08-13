@@ -7,9 +7,7 @@ Email: michael.kim@vanderbilt.edu
 - The app works best on a smaller monitor, as larger monitors tend to update the screen more slowly.
 - If there is a directory with a large number of QA documents (e.g. ADNI with SLANT-TICVv1.2), it will take a while to pre-load images, so please be patient and try not to click outside of the web browser (it MIGHT crash otherwise)
 
-## Features to add
-- Template for QA processes such as PreQual that are PDFs instead of singular PNGs. (Work with Nazirah to determine which pages of the PDFs are best for QA and what the format should be)
-    - We determined that everything will be a single PNG instead
+## Features to add later
 - Speed setting: allows you to set the montage speed
 - Reverse montage: allows you to montage in reverse order
 - Blanket error catch: in case any errors occur in HTML, freezes the entire screen with an error message overlaid
