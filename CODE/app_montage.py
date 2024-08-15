@@ -249,6 +249,8 @@ def check_png_for_json(dicts, pngs):
     pipeline = get_BIDS_fields_from_png(pngs[0], return_pipeline=True)['pipeline']
 
     for dic in dicts:
+        #print(dic)
+        #print(pipeline)
         sub, ses, acq, run = dic['sub'], dic['ses'], dic['acq'], dic['run']
         png = f'{sub}_'
         if ses:

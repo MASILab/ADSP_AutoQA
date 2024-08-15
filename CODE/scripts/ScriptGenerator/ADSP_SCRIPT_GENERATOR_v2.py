@@ -228,7 +228,7 @@ class ScriptGeneratorSetup:
                         'tractseg': ["/nobackup/p_masi/Singularities/tractseg.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif"],
                         'MaCRUISE': "/nobackup/p_masi/Singularities/macruise_classern_v3.2.0.simg",
                         'FrancoisSpecial': '/nobackup/p_masi/Singularities/singularity_francois_special_v1.sif',
-                        'ConnectomeSpecial': '/nobackup/p_masi/Singularities/ConnectomeSpecialSingularity_build1.1.sif',
+                        'ConnectomeSpecial': '/nobackup/p_masi/Singularities/ConnectomeSpecial_v1.2.sif',
                         'Biscuit': '/nobackup/p_masi/Singularities/biscuit_FC_v2.2.sif',
                         'NODDI': '/nobackup/p_masi/Singularities/tractoflow_2.2.1_b9a527_2021-04-13.sif',
                         'freewater': '/nobackup/p_masi/Singularities/FreeWaterEliminationv2.sif',
