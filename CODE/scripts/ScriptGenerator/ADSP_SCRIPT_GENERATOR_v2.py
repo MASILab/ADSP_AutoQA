@@ -67,6 +67,7 @@ def pa():
     p.add_argument('--custom_home', default='', type=str, help="Path to the custom home directory for the user if --no_accre is set (for Tractseg)")
     p.add_argument('--TE_tolerance_PQ', default=0.01, type=float, help="Tolerance for TE differences in determining scan similarity for PreQual")
     p.add_argument('--TR_tolerance_PQ', default=0.01, type=float, help="Tolerance for TR differences in determining scan similarity for PreQual")
+    p.add_argument('--accre_gpu', action='store_true', help="If you want to run the pipeline on ACCRE with a GPU (note, you may need to specify simgs with a CUDA installation)")
     return p.parse_args()
 
 class ScriptGeneratorSetup:
@@ -357,6 +358,10 @@ class ScriptGeneratorSetup:
             slurm.write("#SBATCH --time={}\n".format(self.slurm_options['time']))
             slurm.write("#SBATCH --array=1-{}%{}\n".format(self.generator.count, self.slurm_options['num_jobs']))
             slurm.write("#SBATCH --output={}/logs_%A_%a.out\n".format(self.log_dir))
+            if self.args.accre_gpu:
+                slurm.write("#SBATCH --account=vuiis_masi_gpu_acc\n")
+                slurm.write("#SBATCH --partition=pascal\n")
+                slurm.write("#SBATCH --gres=gpu:1\n")
             slurm.write("\n")
 
             if self.args.pipeline == 'freesurfer' or self.args.pipeline == 'NODDI':
@@ -3012,10 +3017,16 @@ class BedpostX_plus_DWI_plus_TractsegGenerator(ScriptGenerator):
         Writes a single script for running bedpostx + DTI + Tractseg
         """
         #define the singularities
-        ts_simg = self.setup.simg[0]
-        scilus_simg = self.setup.simg[1]
-        mrtrix_simg = self.setup.simg[1]
-        dwi_simg = self.setup.simg[2]
+        if self.setup.args.accre_gpu:
+            ts_simg = self.setup.simg[0]
+            scilus_simg = self.setup.simg[1]
+            mrtrix_simg = self.setup.simg[0]
+            dwi_simg = self.setup.simg[2]
+        else:
+            ts_simg = self.setup.simg[0]
+            scilus_simg = self.setup.simg[1]
+            mrtrix_simg = self.setup.simg[1]
+            dwi_simg = self.setup.simg[2]
 
         #define the directories to bind
         dti_dir = '{}/DTI'.format(kwargs['temp_dir'])
@@ -3090,7 +3101,10 @@ class BedpostX_plus_DWI_plus_TractsegGenerator(ScriptGenerator):
         script.write("mv {indir}/b0_masked_mask.nii.gz {indir}/nodif_brain_mask.nii.gz\n".format(indir=bedpostinput))
 
         #now run bedpostX (need to bind the parent directory so we can write the bedpost outputs to it)
-        script.write("time singularity exec -B {indir}:{indir} -B {parent}:{parent} {fsl} bedpostx {indir}\n".format(indir=bedpostinput, fsl=dwi_simg, parent=kwargs['temp_dir']))
+        if self.setup.args.accre_gpu:
+            script.write("time singularity exec --nv -e --contain -B {indir}:{indir} -B {parent}:{parent} {fsl} bedpostx_gpu {indir}\n".format(indir=bedpostinput, fsl=ts_simg, parent=kwargs['temp_dir']))
+        else:
+            script.write("time singularity exec -B {indir}:{indir} -B {parent}:{parent} {fsl} bedpostx {indir}\n".format(indir=bedpostinput, fsl=dwi_simg, parent=kwargs['temp_dir']))
         bedpost_ouputs = "{}/bedpostXinputs.bedpostX".format(kwargs['temp_dir'])
 
         #now run tractseg
@@ -3105,10 +3119,17 @@ class BedpostX_plus_DWI_plus_TractsegGenerator(ScriptGenerator):
         tractsegdir = "{}/tractseg".format(kwargs['temp_dir'])
         script.write("mkdir -p {}\n".format(tractsegdir))
  
-        script.write("time singularity run -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir}\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg))
-        script.write("time singularity run -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir} --output_type endings_segmentation\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg))
-        script.write("time singularity run -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir} --output_type TOM\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg))
-        script.write("time singularity run -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} Tracking -i {bedpost}/dyads1.nii.gz -o {outdir} --tracking_format tck\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg))
+        if self.setup.args.accre_gpu:
+            script.write("time singularity run -e --contain --nv -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir}\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg))
+            script.write("time singularity run -e --contain --nv -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir} --output_type endings_segmentation\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg))
+            script.write("time singularity run -e --contain --nv -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir} --output_type TOM\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg))
+            script.write("time singularity run -e --contain --nv -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} Tracking -i {bedpost}/dyads1.nii.gz -o {outdir} --tracking_format tck\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg))
+
+        else:
+            script.write("time singularity run -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir}\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg))
+            script.write("time singularity run -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir} --output_type endings_segmentation\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg))
+            script.write("time singularity run -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir} --output_type TOM\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg))
+            script.write("time singularity run -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} Tracking -i {bedpost}/dyads1.nii.gz -o {outdir} --tracking_format tck\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg))
 
         script.write('echo "..............................................................................."\n')
         script.write("echo Done running TractSeg. Now computing measures per bundle...\n")
