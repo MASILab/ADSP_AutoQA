@@ -47,9 +47,10 @@ def get_BIDS_fields_from_png(filename, return_pipeline=False):
     Given a QA png filename, return the BIDS fields.
     """
     #pattern = r"sub-(?P<sub>\d+)_ses-(?P<ses>\d+)_\w+acq-(?P<acq>\d+)run-(?P<run>\d+)\.png"
-    pattern = r'(sub-\w+)(?:_(ses-\w+))?_([A-Za-z0-9\.]*)(?:(acq-\w+))?(?:(run-\d{1,2}))?\.png'
+    #pattern = r'(sub-\w+)(?:_(ses-\w+))?_([A-Za-z0-9\.]*)(?:(acq-\w+))?(?:(run-\d{1,2}))?\.png'
+    pattern = r'(sub-\w+)(?:_(ses-\w+))?_([A-Za-z0-9\.\-]+?)(?=acq\-|run\-|\.png)(?:(acq-\w+))?(?:(run-\d{1,2}))?\.png'
     match = re.match(pattern, filename)
-    print("Match:", match)
+    #print("Match:", match)
     assert match, f"Filename {filename} does not match the expected pattern."
     tags = {'sub': match.group(1), 'ses': match.group(2), 'acq': match.group(4), 'run': match.group(5)}
     if return_pipeline:
@@ -339,6 +340,8 @@ def datasets(clicked_path):
 @app.route('/datasets/<path:clicked_path>/<path:pipeline>')
 def render_montage(clicked_path, pipeline):
 
+    print("Beginning montage...")
+
     #define the current user (obtained from os)
     user = os.getlogin()
 
@@ -439,10 +442,10 @@ def serve_image(clicked_path, pipeline, image_filename):
     image_path = os.path.join(QA_directory, clicked_path, pipeline, image_filename)
 
     # Check if the image file exists
-    print("Checking for file:", image_path)
+    #print("Checking for file:", image_path)
     if os.path.isfile(image_path):
         # Send the image file as a response
-        print("Sending file:", image_path)
+        #print("Sending file:", image_path)
         return send_file(image_path, mimetype='image/png')
     else:
         # Return a 404 error if the file doesn't exist

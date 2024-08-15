@@ -227,6 +227,7 @@
         // Function to fetch image dynamically
         function fetchImage(imagePath, imgElement) {
             // Fetch image path dynamically from Flask endpoint
+            //console.log('Fetching image from URL:', imagePath);
             fetch(`{{ url_for('serve_image', clicked_path=clicked_path, pipeline=pipeline, image_filename=imagePath) }}`)
                 .then(response => {
                     if (!response.ok) {
@@ -297,6 +298,7 @@
             // check the status of the current QA button and reason compared to the QA dictionary
                 //if they are different, update the dictionary accordingly and push the changes to the server
             const qaButtons = document.querySelectorAll('.qa-button');
+            console.log(qaButtons); //check to see if the buttons are being selected
             const qaStatus = Array.from(qaButtons).find(btn => btn.classList.contains('active')).textContent.toLowerCase();
             const reasonInput = document.querySelector('.reason-input').value;
             //console.log('Current QA Status:', qaStatus);
@@ -375,7 +377,8 @@
             // Note: JavaScript regex does not have named capture groups directly like Python's (?P<name>pattern)
             // Instead, we use positional capture groups and then access them by index.
             //var pattern = /(sub-\w+)(?:_(ses-\w+))?(?:_(\w+))(?:(acq-\w+))?(?:(run-\d{1,2}))?.png/;
-            var pattern = /(sub-\w+)(?:_(ses-\w+))?_([A-Za-z0-9\.]*)(?:(acq-\w+))?(?:(run-\d{1,2}))?\.png/;
+            //var pattern = /(sub-\w+)(?:_(ses-\w+))?_([A-Za-z0-9\.]*)(?:(acq-\w+))?(?:(run-\d{1,2}))?\.png/;
+            var pattern = /(sub-\w+)(?:_(ses-\w+))?_([A-Za-z0-9\.\-]+?)(?=acq\-|run\-|\.png)(?:(acq-\w+))?(?:(run-\d{1,2}))?\.png/;
             var match = filename.match(pattern);
 
             // Assert that a match is found
@@ -401,6 +404,7 @@
 
         // Function to retrieve a leaf dictionary from a nested dictionary given the BIDS tags
         function getLeafDict(nestedDict, tags) {
+            console.log('Tags:', tags);
             var leafDict = nestedDict[tags.sub];
             if (tags.ses !== undefined) {
                 leafDict = leafDict[tags.ses];
