@@ -3111,25 +3111,26 @@ class BedpostX_plus_DWI_plus_TractsegGenerator(ScriptGenerator):
         script.write("echo Done running bedpostX. Now running TractSeg...\n")
         script.write('echo "..............................................................................."\n')
         if not self.setup.args.no_accre:
-            script.write("echo Loading FSL...\n")
+            #script.write("echo Loading FSL...\n")
 
-            script.write("export FSL_DIR=/accre/arch/easybuild/software/MPI/GCC/6.4.0-2.28/OpenMPI/2.1.1/FSL/5.0.10/fsl\n")
-            script.write("source setup_accre_runtime_dir\n")
+            #script.write("export FSL_DIR=/accre/arch/easybuild/software/MPI/GCC/6.4.0-2.28/OpenMPI/2.1.1/FSL/5.0.10/fsl\n")
+            #script.write("source setup_accre_runtime_dir\n")
+            pass
 
         tractsegdir = "{}/tractseg".format(kwargs['temp_dir'])
         script.write("mkdir -p {}\n".format(tractsegdir))
  
         if self.setup.args.accre_gpu:
-            script.write("time singularity exec -e --contain --nv -B {bedpost}:{bedpost} -B {accrehome}:{accrehome} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir}\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg, accrehome=kwargs['accre_home']))
-            script.write("time singularity exec -e --contain --nv -B {bedpost}:{bedpost} -B {accrehome}:{accrehome} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir} --output_type endings_segmentation\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg, accrehome=kwargs['accre_home']))
-            script.write("time singularity exec -e --contain --nv -B {bedpost}:{bedpost} -B {accrehome}:{accrehome} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir} --output_type TOM\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg, accrehome=kwargs['accre_home']))
-            script.write("time singularity exec -e --contain --nv -B {bedpost}:{bedpost} -B {accrehome}:{accrehome} -B {outdir}:{outdir} {simg} Tracking -i {bedpost}/dyads1.nii.gz -o {outdir} --tracking_format tck\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg, accrehome=kwargs['accre_home']))
+            script.write("time singularity exec -e --contain --nv -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir}\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg, accrehome=kwargs['accre_home']))
+            script.write("time singularity exec -e --contain --nv -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir} --output_type endings_segmentation\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg, accrehome=kwargs['accre_home']))
+            script.write("time singularity exec -e --contain --nv -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir} --output_type TOM\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg, accrehome=kwargs['accre_home']))
+            script.write("time singularity exec -e --contain --nv -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} Tracking -i {bedpost}/dyads1.nii.gz -o {outdir} --tracking_format tck\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg, accrehome=kwargs['accre_home']))
 
         else:
-            script.write("time singularity exec -e --contain -B {bedpost}:{bedpost} -B {accrehome}:{accrehome} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir}\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg, accrehome=kwargs['accre_home']))
-            script.write("time singularity exec -e --contain -B {bedpost}:{bedpost} -B {accrehome}:{accrehome} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir} --output_type endings_segmentation\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg, accrehome=kwargs['accre_home']))
-            script.write("time singularity exec -e --contain -B {bedpost}:{bedpost} -B {accrehome}:{accrehome} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir} --output_type TOM\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg, accrehome=kwargs['accre_home']))
-            script.write("time singularity exec -e --contain -B {bedpost}:{bedpost} -B {accrehome}:{accrehome} -B {outdir}:{outdir} {simg} Tracking -i {bedpost}/dyads1.nii.gz -o {outdir} --tracking_format tck\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg, accrehome=kwargs['accre_home']))
+            script.write("time singularity exec -e --contain -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir}\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg, accrehome=kwargs['accre_home']))
+            script.write("time singularity exec -e --contain -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir} --output_type endings_segmentation\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg, accrehome=kwargs['accre_home']))
+            script.write("time singularity exec -e --contain -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir} --output_type TOM\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg, accrehome=kwargs['accre_home']))
+            script.write("time singularity exec -e --contain -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} Tracking -i {bedpost}/dyads1.nii.gz -o {outdir} --tracking_format tck\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg, accrehome=kwargs['accre_home']))
 
         script.write('echo "..............................................................................."\n')
         script.write("echo Done running TractSeg. Now computing measures per bundle...\n")
