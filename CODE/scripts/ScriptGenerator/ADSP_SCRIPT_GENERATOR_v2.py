@@ -3107,6 +3107,11 @@ class BedpostX_plus_DWI_plus_TractsegGenerator(ScriptGenerator):
             script.write("time singularity exec -B {indir}:{indir} -B {parent}:{parent} {fsl} bedpostx {indir}\n".format(indir=bedpostinput, fsl=dwi_simg, parent=kwargs['temp_dir']))
         bedpost_ouputs = "{}/bedpostXinputs.bedpostX".format(kwargs['temp_dir'])
 
+        #removing links
+        script.write("rm {}/data.nii.gz\n".format(bedpostinput))
+        script.write("rm {}/bvecs\n".format(bedpostinput))
+        script.write("rm {}/bvals\n".format(bedpostinput))
+
         #now run tractseg
         script.write("echo Done running bedpostX. Now running TractSeg...\n")
         script.write('echo "..............................................................................."\n')
@@ -3140,8 +3145,8 @@ class BedpostX_plus_DWI_plus_TractsegGenerator(ScriptGenerator):
         measuresdir = "{}/measures".format(tractsegdir)
         script.write("for i in {}/TOM_trackings/*.tck; do\n".format(tractsegdir))
         script.write('    echo "$i"; s=${i##*/}; s=${s%.tck}; echo $s;\n')
-        script.write('    time singularity exec -B {}:{} --nv {} scil_evaluate_bundles_individual_measures.py {}/$s.tck {}/$s-SHAPE.json --reference={}\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], scilus_simg, trackingdir, measuresdir, isodwi))
-        script.write('    time singularity exec -B {}:{} --nv {} scil_compute_bundle_mean_std.py {}/$s.tck {} {} {} {} --density_weighting --reference={} > {}/$s-DTI.json\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], scilus_simg, trackingdir, faiso, mdiso, adiso, rdiso, isodwi, measuresdir))
+        script.write('    time singularity exec -B {}:{} -e --contain --nv {} scil_evaluate_bundles_individual_measures.py {}/$s.tck {}/$s-SHAPE.json --reference={}\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], scilus_simg, trackingdir, measuresdir, isodwi))
+        script.write('    time singularity exec -B {}:{} -e --contain --nv {} scil_compute_bundle_mean_std.py {}/$s.tck {} {} {} {} --density_weighting --reference={} > {}/$s-DTI.json\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], scilus_simg, trackingdir, faiso, mdiso, adiso, rdiso, isodwi, measuresdir))
         script.write('done\n\n')
 
         script.write("echo Done computing measures per bundle. Now deleting temp inputs and re-organizing outputs...\n")
