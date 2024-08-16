@@ -2871,8 +2871,8 @@ class DWI_plus_TractsegGenerator(ScriptGenerator):
         #### NEED TO REWRITE THE REST BELOW TO USE THE DTI OUTPUTS STRUCTURED AS ABOVE
 
         script.write("echo Resampling to 1mm iso...\n")
-        isodwi = "{}/dwmri_1mm_iso.nii.gz".format(dti_dir)
-        script.write("time singularity run -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, shellnii, isodwi))
+        isodwi = "{}/dwmri_1mm_iso.nii.gz".format(kwargs['temp_dir'])
+        script.write("time singularity run -B {}:{} {} mrgrid {}/dwmri.nii.gz regrid {} -voxel 1\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, kwargs['temp_dir'], isodwi))
         #same for the fa, md, ad, rd
         faiso = "{}/dwmri_tensor_fa_1mm_iso.nii.gz".format(dti_dir)
         mdiso = "{}/dwmri_tensor_md_1mm_iso.nii.gz".format(dti_dir)
@@ -2892,7 +2892,7 @@ class DWI_plus_TractsegGenerator(ScriptGenerator):
             script.write("source setup_accre_runtime_dir\n")
 
         tractsegdir = "{}/tractseg".format(kwargs['temp_dir'])
-        script.write("time singularity run -B {}:{} -B {}:{} {} TractSeg -i {} --raw_diffusion_input -o {} --bvals {} --bvecs {}\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, isodwi, tractsegdir, shellbval, shellbvec))
+        script.write("time singularity run -B {}:{} -B {}:{} {} TractSeg -i {} --raw_diffusion_input -o {} --bvals {}/dwmri.bval --bvecs {}/dwmri.bvec\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, isodwi, tractsegdir, kwargs['temp_dir'], kwargs['temp_dir']))
         script.write('if [[ -f "{}/peaks.nii.gz" ]]; then echo "Successfully created peaks.nii.gz for {}"; error_flag=0; else echo "Improper bvalue/bvector distribution for {}"; error_flag=1; fi\n'.format(tractsegdir, kwargs['temp_dir'], kwargs['temp_dir']))
         script.write('if [[ $error_flag -eq 1 ]]; then echo "Improper bvalue/bvector distribution for {}" >> {}/report_bad_bvector.txt; fi\n\n'.format(kwargs['temp_dir'], kwargs['temp_dir']))        
 
@@ -3070,8 +3070,8 @@ class BedpostX_plus_DWI_plus_TractsegGenerator(ScriptGenerator):
         #### NEED TO REWRITE THE REST BELOW TO USE THE DTI OUTPUTS STRUCTURED AS ABOVE
 
         script.write("echo Resampling to 1mm iso...\n")
-        isodwi = "{}/dwmri_1mm_iso.nii.gz".format(dti_dir)
-        script.write("time singularity exec -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, shellnii, isodwi))
+        isodwi = "{}/dwmri_1mm_iso.nii.gz".format(kwargs['temp_dir'])
+        script.write("time singularity exec -B {}:{} {} mrgrid {}/dwmri.nii.gz regrid {} -voxel 1\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, kwargs['temp_dir'], isodwi))
         #same for the fa, md, ad, rd
         faiso = "{}/dwmri_tensor_fa_1mm_iso.nii.gz".format(dti_dir)
         mdiso = "{}/dwmri_tensor_md_1mm_iso.nii.gz".format(dti_dir)
@@ -3091,11 +3091,11 @@ class BedpostX_plus_DWI_plus_TractsegGenerator(ScriptGenerator):
         
         #link the necessary files
         script.write("ln -s {} {}/data.nii.gz\n".format(isodwi, bedpostinput))
-        script.write("ln -s {}/dwmri%firstshell.bvec {}/bvecs\n".format(dti_dir, bedpostinput))
-        script.write("ln -s {}/dwmri%firstshell.bval {}/bvals\n".format(dti_dir, bedpostinput))
+        script.write("ln -s {}/dwmri.bvec {}/bvecs\n".format(kwargs['temp_dir'], bedpostinput))
+        script.write("ln -s {}/dwmri.bval {}/bvals\n".format(kwargs['temp_dir'], bedpostinput))
 
         #create the bedpostX mask
-        script.write("time singularity exec -B {indir}:{indir} {mrtrix} bash -c \"dwiextract {indir}/data.nii.gz -fslgrad {indir}/bvecs {indir}/bvals - -bzero | mrmath - mean {indir}/b0.nii.gz -axis 3\"\n".format(indir=bedpostinput, mrtrix=dwi_simg))
+        script.write("time singularity exec -B {indir}:{indir} -B {tempdir}:{tempdir} {mrtrix} bash -c \"dwiextract {indir}/data.nii.gz -fslgrad {indir}/bvecs {indir}/bvals - -bzero | mrmath - mean {indir}/b0.nii.gz -axis 3\"\n".format(indir=bedpostinput, mrtrix=dwi_simg, tempdir=kwargs['temp_dir']))
         script.write("time singularity exec -B {indir}:{indir} {mrtrix} bet {indir}/b0.nii.gz {indir}/b0_masked -m -R -f .3\n".format(indir=bedpostinput, mrtrix=dwi_simg))
         script.write("rm {indir}/b0_masked.nii.gz\n".format(indir=bedpostinput))
         script.write("mv {indir}/b0_masked_mask.nii.gz {indir}/nodif_brain_mask.nii.gz\n".format(indir=bedpostinput))
@@ -3120,10 +3120,10 @@ class BedpostX_plus_DWI_plus_TractsegGenerator(ScriptGenerator):
         script.write("mkdir -p {}\n".format(tractsegdir))
  
         if self.setup.args.accre_gpu:
-            script.write("time singularity run -e --contain --nv -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir}\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg))
-            script.write("time singularity run -e --contain --nv -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir} --output_type endings_segmentation\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg))
-            script.write("time singularity run -e --contain --nv -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir} --output_type TOM\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg))
-            script.write("time singularity run -e --contain --nv -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} Tracking -i {bedpost}/dyads1.nii.gz -o {outdir} --tracking_format tck\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg))
+            script.write("time singularity run --nv -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir}\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg))
+            script.write("time singularity run --nv -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir} --output_type endings_segmentation\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg))
+            script.write("time singularity run --nv -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir} --output_type TOM\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg))
+            script.write("time singularity run --nv -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} Tracking -i {bedpost}/dyads1.nii.gz -o {outdir} --tracking_format tck\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg))
 
         else:
             script.write("time singularity run -B {bedpost}:{bedpost} -B {outdir}:{outdir} {simg} TractSeg -i {bedpost}/dyads1.nii.gz -o {outdir}\n".format(bedpost=bedpost_ouputs, outdir=tractsegdir, simg=ts_simg))
