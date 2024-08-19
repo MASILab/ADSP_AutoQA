@@ -111,23 +111,57 @@
         function preloadImagesAndInitialize() {
             let loadedCount = 0;
             const totalImages = imagePaths.length;
-            
-            // Preload all images
+
+            // Function to handle image loading
+            function handleImageLoad() {
+                loadedCount++;
+                updateLoadingBar(loadedCount, totalImages);
+                if (loadedCount === totalImages) {
+                    hideLoadingBar();
+                    initializeMontage();
+                }
+            }
+
             imagePaths.forEach((imagePath, index) => {
                 const imageUrl = constructImageUrl(clickedPath, pipeline, imagePath.split('/').pop());
                 const img = new Image();
                 img.onload = () => {
                     imageElements[index] = img; // Store loaded image element
-                    loadedCount++;
-                    updateLoadingBar(loadedCount, totalImages);
-                    if (loadedCount === imagePaths.length) {
-                        hideLoadingBar();
-                        initializeMontage();
-                    }
+                    handleImageLoad();
+                };
+                img.onerror = () => {
+                    console.log('Error loading image:', imagePath.split('/').pop());
+                    handleImageLoad(); // Ensure loadedCount is updated even if there's an error
                 };
                 img.src = imageUrl;
             });
         }
+        // function preloadImagesAndInitialize() {
+        //     let loadedCount = 0;
+        //     const totalImages = imagePaths.length;
+            
+        //     // Preload all images
+        //     imagePaths.forEach((imagePath, index) => {
+        //         try {
+        //             imageUrl = constructImageUrl(clickedPath, pipeline, imagePath.split('/').pop());
+        //             img = new Image();
+        //         }
+        //         catch {
+        //             console.log('Error loading image:', imagePath.split('/').pop());
+        //         }
+        //         img.onload = () => {
+        //             imageElements[index] = img; // Store loaded image element
+        //             loadedCount++;
+        //             updateLoadingBar(loadedCount, totalImages);
+        //             if (loadedCount === imagePaths.length) {
+        //                 hideLoadingBar();
+        //                 console.log('All images loaded. Hiding laoding bar and initializing montage...');
+        //                 initializeMontage();
+        //             }
+        //         };
+        //         img.src = imageUrl;
+        //     });
+        // }
 
 
         // Function to update the loading bar
