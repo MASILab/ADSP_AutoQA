@@ -128,7 +128,7 @@ def set_file_permissions(file_path, group_name='p_masi', permissions=0o775):
     gid = grp.getgrnam(group_name).gr_gid
     os.chown(file_path, -1, gid)
 
-def convert_json_to_csv(json_dict, pipeline_path):
+def convert_json_to_csv(json_dict, pipeline_path, permissions=False):
     """
     Given a QA JSON dictionary, convert it to a CSV file
     """
@@ -162,7 +162,8 @@ def convert_json_to_csv(json_dict, pipeline_path):
     df_sorted.to_csv(csv_path, index=False)
 
     #set the permissions to be 775 and group to p_masi
-    set_file_permissions(csv_path)
+    if permissions:
+        set_file_permissions(csv_path)
 
     return df_sorted
 
@@ -374,7 +375,7 @@ def render_montage(clicked_path, pipeline):
         print("Creating QA json file...")
         json_dict = create_json_dict(pngs_files)
         #convert the json dictionary to a csv
-        df = convert_json_to_csv(json_dict, pipeline_path)
+        df = convert_json_to_csv(json_dict, pipeline_path, permissions=True)
         #the convert_json_to_csv function will alter the json_dict to include the sub, ses, acq, run tags in the leaf dictionaries
             #so that is why we wait to write the json file until after the csv file is created
         save_json_file(json_path, json_dict, permissions=True)
