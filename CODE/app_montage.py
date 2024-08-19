@@ -302,7 +302,7 @@ def assert_valid_qa_status(dict_list):
     for d in dict_list:
         assert d['QA_status'] in valid_statuses, f"QA status {d['QA_status']} is not valid for dictionary {d}"
 
-def save_json_file(path, dict):
+def save_json_file(path, dict, permissions=False):
     """
     Given a json dictionary, save it to the json file
     """
@@ -310,7 +310,8 @@ def save_json_file(path, dict):
         json.dump(dict, f, indent=4)
     
     #set the permissions to be 775 and group to p_masi
-    set_file_permissions(path)
+    if permissions:
+        set_file_permissions(path)
 
 @app.route('/')
 def index():
@@ -376,7 +377,7 @@ def render_montage(clicked_path, pipeline):
         df = convert_json_to_csv(json_dict, pipeline_path)
         #the convert_json_to_csv function will alter the json_dict to include the sub, ses, acq, run tags in the leaf dictionaries
             #so that is why we wait to write the json file until after the csv file is created
-        save_json_file(json_path, json_dict)
+        save_json_file(json_path, json_dict, permissions=True)
     
     #otherwise, read the json file
     else:
