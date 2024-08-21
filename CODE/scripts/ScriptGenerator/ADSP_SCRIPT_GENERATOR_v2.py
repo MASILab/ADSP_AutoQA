@@ -68,6 +68,7 @@ def pa():
     p.add_argument('--TE_tolerance_PQ', default=0.01, type=float, help="Tolerance for TE differences in determining scan similarity for PreQual")
     p.add_argument('--TR_tolerance_PQ', default=0.01, type=float, help="Tolerance for TR differences in determining scan similarity for PreQual")
     p.add_argument('--accre_gpu', action='store_true', help="If you want to run the pipeline on ACCRE with a GPU (note, you may need to specify simgs with a CUDA installation)")
+    p.add_argument('--tractseg_make_DTI', action='store_true', help="If you want to make the DTI files for Tractseg")
     return p.parse_args()
 
 class ScriptGeneratorSetup:
@@ -225,7 +226,7 @@ class ScriptGeneratorSetup:
                         'EVE3WMAtlas': '/nobackup/p_masi/Singularities/WMAtlas_v1.2.simg',
                         'MNI152WMAtlas': '/nobackup/p_masi/Singularities/WMAtlas_v1.2.simg',
                         'UNest': '/nobackup/p_masi/Singularities/UNest.sif',
-                        'tractseg': ["/nobackup/p_masi/Singularities/tractseg.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif"],
+                        'tractseg': ["/nobackup/p_masi/Singularities/tractseg.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif"] if not self.args.tractseg_make_DTI else ["/nobackup/p_masi/Singularities/tractseg.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif", "/nobackup/p_masi/Singularities/WMAtlas_v1.2.simg"],
                         'MaCRUISE': "/nobackup/p_masi/Singularities/macruise_classern_v3.2.0.simg",
                         'FrancoisSpecial': '/nobackup/p_masi/Singularities/singularity_francois_special_v1.sif',
                         'ConnectomeSpecial': '/nobackup/p_masi/Singularities/ConnectomeSpecial_v1.2.sif',
@@ -2361,9 +2362,44 @@ class TractsegGenerator(ScriptGenerator):
         """
 
         #define the singularities
-        ts_simg = self.setup.simg[0]
-        scilus_simg = self.setup.simg[1]
-        mrtrix_simg = self.setup.simg[1]
+        if self.setup.args.tractseg_make_DTI:
+            ts_simg = self.setup.simg[0]
+            scilus_simg = self.setup.simg[1]
+            mrtrix_simg = self.setup.simg[1]
+            wmatlas_simg = self.setup.simg[2]
+        else:
+            ts_simg = self.setup.simg[0]
+            scilus_simg = self.setup.simg[1]
+            mrtrix_simg = self.setup.simg[1]
+
+        #adds the following lines to make the DTI if necessary
+        if self.setup.args.tractseg_make_DTI:
+            script.write("echo Making DTI...\n")
+            bind1 = "{}:/INPUTS".format(kwargs['temp_dir'])
+            bind2 = "{}:/OUTPUTS".format(kwargs['temp_dir'])
+
+            #first, convert the dwi to tensor
+            script.write("echo Making temp directories...\n")
+            #script.write("mkdir -p {}\n".format(dti_dir))
+            script.write("echo Shelling to 1500...\n")
+            script.write("time singularity exec -B {} -B {} {} python3 /CODE/extract_single_shell.py\n".format(bind1, bind2, wmatlas_simg))
+            script.write("echo Done shelling to 1500. Now fitting tensors DTI...\n")
+
+            shellbvec = "{}/dwmri%firstshell.bvec".format(kwargs['temp_dir'])
+            shellbval = "{}/dwmri%firstshell.bval".format(kwargs['temp_dir'])
+            shellnii = "{}/dwmri%firstshell.nii.gz".format(kwargs['temp_dir'])
+            tensor = "{}/dwmri_tensor.nii.gz".format(kwargs['temp_dir'])
+            script.write("time singularity exec -B {}:{} {} dwi2tensor -fslgrad {} {} {} {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, shellbvec, shellbval, shellnii, tensor))
+            script.write("Comuting DTI scalar maps...")
+            fa = "{}/dwmri_tensor_fa.nii.gz".format(kwargs['temp_dir'])
+            md = "{}/dwmri_tensor_md.nii.gz".format(kwargs['temp_dir'])
+            ad = "{}/dwmri_tensor_ad.nii.gz".format(kwargs['temp_dir'])
+            rd = "{}/dwmri_tensor_rd.nii.gz".format(kwargs['temp_dir'])
+            mask = "{}/mask.ni.gz".format(kwargs['temp_dir'])
+            script.write("time singularity exec -B {}:{} {} tensor2metric {} -fa {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, tensor, fa, mask))
+            script.write("time singularity exec -B {}:{} {} tensor2metric {} -adc {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, tensor, md, mask))
+            script.write("time singularity exec -B {}:{} {} tensor2metric {} -ad {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, tensor, ad, mask))
+            script.write("time singularity exec -B {}:{} {} tensor2metric {} -rd {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, tensor, rd, mask))
 
         script.write("echo Resampling to 1mm iso...\n")
         script.write("time singularity run -B {}:{} {} mrgrid {}/dwmri.nii.gz regrid {}/dwmri_1mm_iso.nii.gz -voxel 1\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, kwargs['temp_dir'], kwargs['temp_dir']))
@@ -2455,15 +2491,19 @@ class TractsegGenerator(ScriptGenerator):
                 continue
 
             #get the tensor maps to use for the mean/std bundle calculations
-            eve3dir = self.setup.dataset_derivs/(sub)/(ses)/("WMAtlasEVE3{}{}".format(acq, run))
-            assert eve3dir.parent.name != "None" and (eve3dir.parent.name == ses or eve3dir.parent.name == sub), "Error in Tractseg generation - EVE3 directory naming is wrong {}".format(eve3dir)
-            tensor_maps = [eve3dir/("dwmri%{}.nii.gz".format(m)) for m in ['fa', 'md', 'ad', 'rd']]
-            using_PQ = False
-            if not all([t.exists() for t in tensor_maps]):
-                #row = {'sub':sub, 'ses':ses, 'acq':acq, 'run':run, 'missing':'tensor_maps'}
-                #missing_data = pd.concat([missing_data, pd.Series(row).to_frame().T], ignore_index=True)
-                self.add_to_missing(sub, ses, acq, run, 'tensor_maps')
-                continue
+            if self.setup.args.tractseg_make_DTI:
+                #create own tensor maps
+                pass
+            else:
+                eve3dir = self.setup.dataset_derivs/(sub)/(ses)/("WMAtlasEVE3{}{}".format(acq, run))
+                assert eve3dir.parent.name != "None" and (eve3dir.parent.name == ses or eve3dir.parent.name == sub), "Error in Tractseg generation - EVE3 directory naming is wrong {}".format(eve3dir)
+                tensor_maps = [eve3dir/("dwmri%{}.nii.gz".format(m)) for m in ['fa', 'md', 'ad', 'rd']]
+                using_PQ = False
+                if not all([t.exists() for t in tensor_maps]):
+                    #row = {'sub':sub, 'ses':ses, 'acq':acq, 'run':run, 'missing':'tensor_maps'}
+                    #missing_data = pd.concat([missing_data, pd.Series(row).to_frame().T], ignore_index=True)
+                    self.add_to_missing(sub, ses, acq, run, 'tensor_maps')
+                    continue
 
             self.count += 1
 
@@ -2478,13 +2518,18 @@ class TractsegGenerator(ScriptGenerator):
                 os.makedirs(tractseg_target)
 
             #setup the inputs dictionary and outputs list
-            self.inputs_dict[self.count] = {
-                'fa_map': {'src_path': eve3dir/'dwmri%fa.nii.gz', 'targ_name': 'dwmri_tensor_fa.nii.gz', 'separate_input': session_temp},
-                'md_map': {'src_path': eve3dir/'dwmri%md.nii.gz', 'targ_name': 'dwmri_tensor_md.nii.gz', 'separate_input': session_temp},
-                'ad_map': {'src_path': eve3dir/'dwmri%ad.nii.gz', 'targ_name': 'dwmri_tensor_ad.nii.gz', 'separate_input': session_temp},
-                'rd_map': {'src_path': eve3dir/'dwmri%rd.nii.gz', 'targ_name': 'dwmri_tensor_rd.nii.gz', 'separate_input': session_temp},
-                'pq_dwi_dir': {'src_path': pqdir/'PREPROCESSED', 'targ_name': '', 'directory': True, 'separate_input': session_temp}
-            }
+            if self.setup.args.tractseg_make_DTI:
+                self.inputs_dict[self.count] = {
+                    'pq_dwi_dir': {'src_path': pqdir/'PREPROCESSED', 'targ_name': '', 'directory': True, 'separate_input': session_temp}
+                }
+            else:
+                self.inputs_dict[self.count] = {
+                    'fa_map': {'src_path': eve3dir/'dwmri%fa.nii.gz', 'targ_name': 'dwmri_tensor_fa.nii.gz', 'separate_input': session_temp},
+                    'md_map': {'src_path': eve3dir/'dwmri%md.nii.gz', 'targ_name': 'dwmri_tensor_md.nii.gz', 'separate_input': session_temp},
+                    'ad_map': {'src_path': eve3dir/'dwmri%ad.nii.gz', 'targ_name': 'dwmri_tensor_ad.nii.gz', 'separate_input': session_temp},
+                    'rd_map': {'src_path': eve3dir/'dwmri%rd.nii.gz', 'targ_name': 'dwmri_tensor_rd.nii.gz', 'separate_input': session_temp},
+                    'pq_dwi_dir': {'src_path': pqdir/'PREPROCESSED', 'targ_name': '', 'directory': True, 'separate_input': session_temp}
+                }
             self.outputs[self.count] = []
 
 
@@ -3227,6 +3272,18 @@ class BedpostX_plus_DWI_plus_TractsegGenerator(ScriptGenerator):
             #start the script generation
             self.start_script_generation(session_input, session_output, deriv_output_dir=tractsegdwi_target, temp_dir=session_temp,
                                         tractseg_setup=True, accre_home=accre_home_directory, temp_is_output=True)
+
+#for Kurt: run scilpy scipts on tractseg dirs
+class Scilpy_on_TractsegGenerator(ScriptGenerator):
+
+    def __init__(self, setup_object):
+        """
+        Class for running DTI metrics on tractseg outputs
+        """
+        super().__init__(setup_object=setup_object)
+        #self.warnings = {}
+        self.outputs = {}
+        self.inputs_dict = {}
 
 
 def get_shells_and_dirs(PQdir, bval_files, bvec_files):
