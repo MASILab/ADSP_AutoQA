@@ -2395,7 +2395,7 @@ class TractsegGenerator(ScriptGenerator):
             md = "{}/dwmri_tensor_md.nii.gz".format(kwargs['temp_dir'])
             ad = "{}/dwmri_tensor_ad.nii.gz".format(kwargs['temp_dir'])
             rd = "{}/dwmri_tensor_rd.nii.gz".format(kwargs['temp_dir'])
-            mask = "{}/mask.ni.gz".format(kwargs['temp_dir'])
+            mask = "{}/mask.nii.gz".format(kwargs['temp_dir'])
             script.write("time singularity exec -B {}:{} {} tensor2metric {} -fa {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, tensor, fa, mask))
             script.write("time singularity exec -B {}:{} {} tensor2metric {} -adc {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, tensor, md, mask))
             script.write("time singularity exec -B {}:{} {} tensor2metric {} -ad {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, tensor, ad, mask))
