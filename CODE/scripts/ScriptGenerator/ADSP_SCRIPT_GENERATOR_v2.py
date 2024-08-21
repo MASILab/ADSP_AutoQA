@@ -2390,7 +2390,7 @@ class TractsegGenerator(ScriptGenerator):
             shellnii = "{}/dwmri%firstshell.nii.gz".format(kwargs['temp_dir'])
             tensor = "{}/dwmri_tensor.nii.gz".format(kwargs['temp_dir'])
             script.write("time singularity exec -B {}:{} {} dwi2tensor -fslgrad {} {} {} {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, shellbvec, shellbval, shellnii, tensor))
-            script.write("Comuting DTI scalar maps...")
+            script.write("echo Comuting DTI scalar maps...\n")
             fa = "{}/dwmri_tensor_fa.nii.gz".format(kwargs['temp_dir'])
             md = "{}/dwmri_tensor_md.nii.gz".format(kwargs['temp_dir'])
             ad = "{}/dwmri_tensor_ad.nii.gz".format(kwargs['temp_dir'])
