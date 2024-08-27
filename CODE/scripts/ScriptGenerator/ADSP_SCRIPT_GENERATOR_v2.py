@@ -223,18 +223,18 @@ class ScriptGeneratorSetup:
             mapping = {'SLANT-TICV': '/nobackup/p_masi/Singularities/nssSLANT_v1.2.simg',
                         'PreQual': '/nobackup/p_masi/Singularities/PreQual_v1.0.8.simg',
                         'freesurfer': '/nobackup/p_masi/Singularities/freesurfer_7.2.0.sif',
-                        'EVE3WMAtlas': '/nobackup/p_masi/Singularities/WMAtlas_v1.2.simg',
-                        'MNI152WMAtlas': '/nobackup/p_masi/Singularities/WMAtlas_v1.2.simg',
+                        'EVE3WMAtlas': '/nobackup/p_masi/Singularities/WMAtlas_v1.3.simg',
+                        'MNI152WMAtlas': '/nobackup/p_masi/Singularities/WMAtlas_v1.3.simg',
                         'UNest': '/nobackup/p_masi/Singularities/UNest.sif',
                         'tractseg': ["/nobackup/p_masi/Singularities/tractseg.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif"] if not self.args.tractseg_make_DTI else ["/nobackup/p_masi/Singularities/tractseg.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif", "/nobackup/p_masi/Singularities/WMAtlas_v1.2.simg"],
                         'MaCRUISE': "/nobackup/p_masi/Singularities/macruise_classern_v3.2.0.simg",
                         'FrancoisSpecial': '/nobackup/p_masi/Singularities/singularity_francois_special_v1.sif',
-                        'ConnectomeSpecial': '/nobackup/p_masi/Singularities/ConnectomeSpecial_v1.2.sif',
+                        'ConnectomeSpecial': '/nobackup/p_masi/Singularities/ConnectomeSpecial_v1.3.sif',
                         'Biscuit': '/nobackup/p_masi/Singularities/biscuit_FC_v2.2.sif',
                         'NODDI': '/nobackup/p_masi/Singularities/tractoflow_2.2.1_b9a527_2021-04-13.sif',
                         'freewater': '/nobackup/p_masi/Singularities/FreeWaterEliminationv2.sif',
-                        'DWI_plus_Tractseg': ["/nobackup/p_masi/Singularities/tractseg.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif", "/nobackup/p_masi/Singularities/WMAtlas_v1.2.simg"],
-                        'BedpostX_plus_Tractseg': ["/nobackup/p_masi/Singularities/tractseg.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif", "/nobackup/p_masi/Singularities/WMAtlas_v1.2.simg"]
+                        'DWI_plus_Tractseg': ["/nobackup/p_masi/Singularities/tractseg.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif", "/nobackup/p_masi/Singularities/WMAtlas_v1.3.simg"],
+                        'BedpostX_plus_Tractseg': ["/nobackup/p_masi/Singularities/tractseg.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif", "/nobackup/p_masi/Singularities/WMAtlas_v1.3.simg"]
                     }
             simg = mapping[self.args.pipeline]
         except:
@@ -744,6 +744,29 @@ class ScriptGenerator:
         return True
 
 
+    def is_missing_DTI_tractseg(self, tsdir):
+        """
+        Returns true if the DTI tractseg outputs are missing
+        """
+
+        #get the bundles and measures dirs
+        bundles = tsdir/("bundles")
+        measures = tsdir/("measures")
+
+        if not bundles.exists() or not measures.exists():
+            #print(tsdir, "False")
+            return False
+
+        #count the files in each one to make sure that there is the correct number of bundles and measures
+        num_bundles = len(list(bundles.glob("*.tck")))
+        num_measures = len(list(measures.glob("*DTI.json")))
+
+        #arbitrary numbers
+        if num_bundles >= 70 and num_measures <= 10:
+            #print(tsdir, 'Missing')
+            #return 'Missing Files'
+            return True
+        return False
 
     def has_Tractseg_outputs(self, tsdir):
         """
@@ -1861,7 +1884,7 @@ class EVE3WMAtlasGenerator(ScriptGenerator):
         """
 
         script.write("echo Running EVE3 registration...\n")
-        script.write("singularity run -e -B {}:/INPUTS -B {}:/OUTPUTS {} --EVE3\n".format(session_input, session_output, self.setup.simg))
+        script.write("singularity run -e --contain -B /tmp:/tmp -B {}:/INPUTS -B {}:/OUTPUTS {} --EVE3\n".format(session_input, session_output, self.setup.simg))
         script.write("echo Finished running EVE3 registration. Now removing inputs and copying outputs back...\n")
 
         script.write("echo Checking if any values are greater than 1500...\n")
@@ -1968,7 +1991,7 @@ class MNI152WMAtlasGenerator(ScriptGenerator):
         """
 
         script.write("echo Running MNI152 registration...\n")
-        script.write("singularity run -e -B {}:/INPUTS -B {}:/OUTPUTS {} --MNI\n".format(session_input, session_output, self.setup.simg))
+        script.write("singularity run -e --contain -B /tmp:/tmp -B {}:/INPUTS -B {}:/OUTPUTS {} --MNI\n".format(session_input, session_output, self.setup.simg))
         script.write("echo Finished running MNI152 registration. Now removing inputs and copying outputs back...\n")
         #always remove for MNI registration
         script.write("rm {}\n".format(str(session_output/'dwmri%firstshell.nii.gz')))
@@ -2237,7 +2260,7 @@ class ConnectomeSpecialGenerator(ScriptGenerator):
         """
 
         script.write("echo Running Connectome Special...\n")
-        script.write("singularity run --bind {}:/DIFFUSION/,{}:/SLANT/,{}:/OUTPUTS/ {}\n".format(kwargs['PQ_inp'], kwargs['seg_input'], session_output, self.setup.simg))
+        script.write("singularity run -e --contain --bind {}:/DIFFUSION/,{}:/SLANT/,{}:/OUTPUTS/,/tmp:/tmp {}\n".format(kwargs['PQ_inp'], kwargs['seg_input'], session_output, self.setup.simg))
         script.write("echo Finished running Connectome Special. Now removing inputs and copying outputs back...\n")
 
 
@@ -3285,6 +3308,103 @@ class Scilpy_on_TractsegGenerator(ScriptGenerator):
         self.outputs = {}
         self.inputs_dict = {}
 
+    def scilpy_on_tractseg_script_generate(self, script, session_input, session_output, **kwargs):
+        """
+        Writes a single script for running scilpy DTI metrics on tractseg outputs
+        """
+
+        #just need the scilpy singularity and WMAtlas
+        dwi_simg = self.setup.simg[0]
+        scilus_simg = self.setup.simg[1]
+
+        #define the directories to bind
+        dti_dir = '{}/DTI'.format(kwargs['temp_dir'])
+        bind1 = "{}:/INPUTS".format(kwargs['temp_dir'])
+        bind2 = "{}:/OUTPUTS".format(dti_dir)
+
+        #first, convert the dwi to tensor
+        script.write("echo Making temp directories...\n")
+        script.write("mkdir -p {}\n".format(dti_dir))
+        script.write("echo Shelling to 1500...\n")
+        script.write("time singularity exec -B {} -B {} {} python3 /CODE/extract_single_shell.py\n".format(bind1, bind2, dwi_simg))
+        script.write("echo Done shelling to 1500. Now fitting tensors DTI...\n")
+
+        mask = "{}/mask.nii.gz".format(kwargs['temp_dir'])
+        shellbvec = "{}/dwmri%firstshell.bvec".format(dti_dir)
+        shellbval = "{}/dwmri%firstshell.bval".format(dti_dir)
+        shellnii = "{}/dwmri%firstshell.nii.gz".format(dti_dir)
+        tensor = "{}/dwmri_tensor.nii.gz".format(dti_dir)
+        script.write("time singularity exec -B {}:{} {} dwi2tensor -fslgrad {} {} {} {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, shellbvec, shellbval, shellnii, tensor))
+        script.write("echo Calculating FA, MD, AD, RD...\n")
+        fa = "{}/dwmri_tensor_fa.nii.gz".format(dti_dir)
+        md = "{}/dwmri_tensor_md.nii.gz".format(dti_dir)
+        ad = "{}/dwmri_tensor_ad.nii.gz".format(dti_dir)
+        rd = "{}/dwmri_tensor_rd.nii.gz".format(dti_dir)
+        script.write("time singularity exec -B {}:{} {} tensor2metric {} -fa {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, tensor, fa, mask))
+        script.write("time singularity exec -B {}:{} {} tensor2metric {} -adc {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, tensor, md, mask))
+        script.write("time singularity exec -B {}:{} {} tensor2metric {} -ad {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, tensor, ad, mask))
+        script.write("time singularity exec -B {}:{} {} tensor2metric {} -rd {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, tensor, rd, mask))
+        script.write("echo Done fitting tensors. Now computing measures per bundle...\n")
+
+        bundlesdir = "{}/bundles".format(kwargs['temp_dir'])
+        measuresdir = "{}/measures".format(kwargs['temp_dir'])
+        script.write("for i in {}/*.tck; do\n".format(bundlesdir))
+        script.write('    echo "$i"; s=${i##*/}; s=${s%.tck}; echo $s;\n')
+        #script.write('    time singularity exec -B {}:{} --nv {} scil_evaluate_bundles_individual_measures.py {}/$s.tck {}/$s-SHAPE.json --reference={}\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], scilus_simg, trackingdir, measuresdir, isodwi))
+        script.write('    time singularity exec -B {}:{} --nv {} scil_compute_bundle_mean_std.py {}/$s.tck {} {} {} {} --density_weighting --reference={} > {}/$s-DTI.json\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], scilus_simg, trackingdir, faiso, mdiso, adiso, rdiso, isodwi, measuresdir))
+        script.write('done\n\n')
+
+    def generate_scilpy_ts_metrics_list(self):
+        """
+        For the runs that do not have metrics computed, redo the calculations
+        """
+
+        root_temp = Path(self.setup.args.temp_dir)
+        assert root_temp.exists() and os.access(root_temp, os.W_OK), "Error: Root temp directory {} does not exist or is not writable".format(root_temp)
+
+        #get the accre home directory / home directory for the tractseg inputs
+        if self.setup.args.no_accre:
+            if self.setup.args.custom_home != '':
+                accre_home_directory = self.setup.args.custom_home
+            else:
+                accre_home_directory = os.path.expanduser("~")
+                user = accre_home_directory.split('/')[-1]
+                accre_home_directory = "/home/local/VANDERBILT/{}/".format(user)
+        else:
+            accre_home_directory = os.path.expanduser("~")     
+        
+        prequal_dirs = self.get_PreQual_dirs()
+
+        for pqdir_p in tqdm(prequal_dirs):
+            pqdir = Path(pqdir_p)
+            #get the BIDS tags
+            sub, ses, acq, run = self.get_BIDS_fields_from_PQdir(pqdir) 
+
+            #check to see if the Tractseg dir exists
+            tractsegdwi_target = self.setup.dataset_derivs/(sub)/(ses)/("Tractseg{}{}".format(acq, run))
+            if not tractsegdwi_target.exists():
+                continue
+
+            #check to see if the Tractseg outputs already exist
+            tractseg_dir = self.setup.dataset_derivs/(sub)/(ses)/("Tractseg{}{}".format(acq, run))
+            if not self.is_missing_DTI_tractseg(tractseg_dir):
+                continue
+
+            self.count += 1
+
+            #create the temp session directories
+            session_temp = root_temp/(sub)/("{}{}{}".format(ses,acq,run))
+            (session_input, session_output, session_temp) = self.make_session_dirs(sub, ses, acq, run, tmp_input_dir=self.setup.tmp_input_dir,
+                                            tmp_output_dir=self.setup.tmp_output_dir, temp_dir=root_temp, has_temp=True)
+            
+            #create the inputs dictionary
+            self.inputs_dict[self.count] = {
+                    'pq_dwi_dir': {'src_path': pqdir/'PREPROCESSED', 'targ_name': '', 'directory': True, 'separate_input': session_temp}
+            }
+            self.outputs[self.count] = []
+
+            self.start_script_generation(session_input, session_output, deriv_output_dir=tractsegdwi_target, temp_dir=session_temp,
+                                        tractseg_setup=True, accre_home=accre_home_directory, temp_is_output=True)
 
 def get_shells_and_dirs(PQdir, bval_files, bvec_files):
     """
