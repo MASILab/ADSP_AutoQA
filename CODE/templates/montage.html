@@ -386,24 +386,46 @@
 
             // when navigating to the last image, stop the loop
             if (currentImageIndex === imagePaths.length - 1) {
-                clearInterval(updateInterval);
+                //clearInterval(updateInterval); #commented out for testing faster fn
                 isLooping = false;
             }
 
             initializeMontage();
         }
 
-        // Function to toggle looping (maybe include a backwards montage option as well)
+        function startImageLoop() {
+            isLooping = true;
+            function loop() {
+                if (isLooping) {
+                    navigateImage(1); // Move to next image
+                    setTimeout(() => requestAnimationFrame(loop), 250); // Adjust timeout for desired speed
+                }
+            }
+            requestAnimationFrame(loop);
+        }
+
         function toggleLoop() {
             isLooping = !isLooping;
             if (isLooping) {
-                updateInterval = setInterval(() => {
-                    navigateImage(1); // Move to next image every 0.25 seconds
-                }, 250);
+                startImageLoop();
             } else {
-                clearInterval(updateInterval);
+                // Note: There's no direct way to stop `requestAnimationFrame`, so you rely on `isLooping`
+                
             }
         }
+
+        //commented out for testing faster fn
+        // // Function to toggle looping (maybe include a backwards montage option as well)
+        // function toggleLoop() {
+        //     isLooping = !isLooping;
+        //     if (isLooping) {
+        //         updateInterval = setInterval(() => {
+        //             navigateImage(1); // Move to next image every 0.25 seconds
+        //         }, 250);
+        //     } else {
+        //         clearInterval(updateInterval);
+        //     }
+        // }
 
         // Function to extract BIDS fields from a PNG filename. Returns a dictionary with the BIDS fields
         function getBIDSFieldsFromPNG(filename, returnPipeline = false) {
