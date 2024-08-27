@@ -4,7 +4,8 @@ Written by Michael Kim.
 Email: michael.kim@vanderbilt.edu
 
 ## NOTES FOR USE:
-- DO NOT have multiple people simultaneuosly QAing the same dataset/pipeline: the CSV is only read in when starting the app, new updates are not detected utill the app is run again.
+- The app runs WAYYY faster and smoother when using chrome as the web browser. Firefox is very slow and jittery.
+- *DO NOT have multiple people simultaneuosly QAing the same dataset/pipeline: the CSV is only read in when starting the app, new updates are not detected utill the app is run again.*
 - The app works best on a smaller monitor, as larger monitors tend to update the screen more slowly.
 - If there is a directory with a large number of QA documents (e.g. ADNI with SLANT-TICVv1.2), it will take a while to pre-load images, so please be patient and try not to click outside of the web browser (it MIGHT crash otherwise)
 
