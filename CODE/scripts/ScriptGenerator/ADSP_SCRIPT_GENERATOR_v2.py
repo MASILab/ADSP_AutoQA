@@ -2347,7 +2347,7 @@ class ConnectomeSpecialGenerator(ScriptGenerator):
                 'pq_dwi_dir': {'src_path': pqdir/'PREPROCESSED', 'targ_name': preproc_dir, 'directory': True}
             }
             #now the T1 and the segmentation
-            seg_pre_dir = 'Slant/pre/{}'.format(t1.name.split('.nii')[0])
+            seg_pre_dir = 'Slant/pre/{}'.format(Path(t1).name.split('.nii')[0])
             self.inputs_dict[self.count]['t1'] = {'src_path': t1, 'targ_name': '{}/orig_target.nii.gz'.format(seg_pre_dir)}
             seg_post_final = 'Slant/post/FinalResult'
             if self.setup.args.use_unest_seg:
