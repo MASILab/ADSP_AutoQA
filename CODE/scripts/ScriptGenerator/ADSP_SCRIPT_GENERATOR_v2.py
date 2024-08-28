@@ -2261,6 +2261,8 @@ class ConnectomeSpecialGenerator(ScriptGenerator):
 
         script.write("echo Running Connectome Special...\n")
         script.write("singularity run -e --contain --bind {}:/DIFFUSION/,{}:/SLANT/,{}:/OUTPUTS/,/tmp:/tmp {}\n".format(kwargs['PQ_inp'], kwargs['seg_input'], session_output, self.setup.simg))
+        script.write("echo Removing temp outputs...\n")
+        script.write("rm -r {}/TEMP\n".format(session_output))
         script.write("echo Finished running Connectome Special. Now removing inputs and copying outputs back...\n")
 
 
