@@ -1349,7 +1349,7 @@ class PreQualGenerator(ScriptGenerator):
 
         #write the PreQual command
         script.write("echo Done writing config file. Now running PreQual...\n")
-        script.write('singularity run -e -B {}:/INPUTS -B {}:/OUTPUTS -B {}:/APPS/freesurfer/license.txt {} {} {}\n'.format(str(session_input),
+        script.write('singularity run -e --contain -B {}:/INPUTS -B {}:/OUTPUTS -B {}:/APPS/freesurfer/license.txt -B /tmp:/tmp {} {} {}\n'.format(str(session_input),
             str(session_output), str(self.setup.freesurfer_license_path), str(self.setup.simg), PEaxis, opts))
         script.write("echo Finished running PreQual. Now removing inputs and copying outputs back...\n")
 
@@ -1571,7 +1571,7 @@ class FreeSurferGenerator(ScriptGenerator):
 
         #write the recon-all command
         script.write("echo Running recon-all on T1...\n")
-        script.write('time singularity exec -c --contain -B {}:/usr/local/freesurfer/.license -B {}:{} -B {}:{} {} recon-all -i {} -subjid freesurfer -sd {}/ -all\n'.format(self.setup.freesurfer_license_path, session_input, session_input, session_output, session_output, self.setup.simg, kwargs['input_targets']['t1'], session_output))
+        script.write('time singularity exec -e --contain -B {}:/usr/local/freesurfer/.license -B {}:{} -B {}:{} {} recon-all -i {} -subjid freesurfer -sd {}/ -all\n'.format(self.setup.freesurfer_license_path, session_input, session_input, session_output, session_output, self.setup.simg, kwargs['input_targets']['t1'], session_output))
         #"time singularity exec -e --contain -B {}:/usr/local/freesurfer/.license -B {}:{} -B {}:{} {} recon-all -i {} -subjid freesurfer -sd {}/ -all > {}/freesurfer.log".format(license_file, t1, t1, out_dir, out_dir, simg_path, t1, out_dir, out_dir)
         script.write("echo Finished running recon-all. Now removing inputs and copying outputs back...\n")
 
@@ -1637,7 +1637,7 @@ class SLANT_TICVGenerator(ScriptGenerator):
         eb4 = "\"{}/\":/opt/slant/dl/working_dir".format(kwargs['dl'])
         eb5 = "\"{}/\":/opt/slant/matlab/output_post".format(kwargs['post'])
 
-        script.write("singularity exec -B {} -B {} -B {} -B {} -B {} -e {} /opt/slant/run.sh\n".format(eb1, eb2, eb3, eb4, eb5, self.setup.simg))
+        script.write("singularity exec -B {} -B {} -B {} -B {} -B {} -B /tmp:/tmp -e {} /opt/slant/run.sh\n".format(eb1, eb2, eb3, eb4, eb5, self.setup.simg))
         script.write("echo Finished running SLANT-TICV. Now removing pre and dl directories...\n")
         script.write("rm -r {}/*\n".format(kwargs['pre']))
         script.write("rm -r {}/*\n".format(kwargs['dl']))
@@ -2407,32 +2407,32 @@ class TractsegGenerator(ScriptGenerator):
             script.write("echo Making temp directories...\n")
             #script.write("mkdir -p {}\n".format(dti_dir))
             script.write("echo Shelling to 1500...\n")
-            script.write("time singularity exec -B {} -B {} {} python3 /CODE/extract_single_shell.py\n".format(bind1, bind2, wmatlas_simg))
+            script.write("time singularity exec -e --contain -B /tmp:/tmp -B {} -B {} {} python3 /CODE/extract_single_shell.py\n".format(bind1, bind2, wmatlas_simg))
             script.write("echo Done shelling to 1500. Now fitting tensors DTI...\n")
 
             shellbvec = "{}/dwmri%firstshell.bvec".format(kwargs['temp_dir'])
             shellbval = "{}/dwmri%firstshell.bval".format(kwargs['temp_dir'])
             shellnii = "{}/dwmri%firstshell.nii.gz".format(kwargs['temp_dir'])
             tensor = "{}/dwmri_tensor.nii.gz".format(kwargs['temp_dir'])
-            script.write("time singularity exec -B {}:{} {} dwi2tensor -fslgrad {} {} {} {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, shellbvec, shellbval, shellnii, tensor))
+            script.write("time singularity exec -e --contain -B /tmp:/tmp -B {}:{} {} dwi2tensor -fslgrad {} {} {} {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, shellbvec, shellbval, shellnii, tensor))
             script.write("echo Comuting DTI scalar maps...\n")
             fa = "{}/dwmri_tensor_fa.nii.gz".format(kwargs['temp_dir'])
             md = "{}/dwmri_tensor_md.nii.gz".format(kwargs['temp_dir'])
             ad = "{}/dwmri_tensor_ad.nii.gz".format(kwargs['temp_dir'])
             rd = "{}/dwmri_tensor_rd.nii.gz".format(kwargs['temp_dir'])
             mask = "{}/mask.nii.gz".format(kwargs['temp_dir'])
-            script.write("time singularity exec -B {}:{} {} tensor2metric {} -fa {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, tensor, fa, mask))
-            script.write("time singularity exec -B {}:{} {} tensor2metric {} -adc {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, tensor, md, mask))
-            script.write("time singularity exec -B {}:{} {} tensor2metric {} -ad {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, tensor, ad, mask))
-            script.write("time singularity exec -B {}:{} {} tensor2metric {} -rd {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, tensor, rd, mask))
+            script.write("time singularity exec -e --contain -B /tmp:/tmp -B {}:{} {} tensor2metric {} -fa {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, tensor, fa, mask))
+            script.write("time singularity exec -e --contain -B /tmp:/tmp -B {}:{} {} tensor2metric {} -adc {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, tensor, md, mask))
+            script.write("time singularity exec -e --contain -B /tmp:/tmp -B {}:{} {} tensor2metric {} -ad {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, tensor, ad, mask))
+            script.write("time singularity exec -e --contain -B /tmp:/tmp -B {}:{} {} tensor2metric {} -rd {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, tensor, rd, mask))
 
         script.write("echo Resampling to 1mm iso...\n")
-        script.write("time singularity run -B {}:{} {} mrgrid {}/dwmri.nii.gz regrid {}/dwmri_1mm_iso.nii.gz -voxel 1\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, kwargs['temp_dir'], kwargs['temp_dir']))
+        script.write("time singularity run -e --contain -B /tmp:/tmp -B {}:{} {} mrgrid {}/dwmri.nii.gz regrid {}/dwmri_1mm_iso.nii.gz -voxel 1\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, kwargs['temp_dir'], kwargs['temp_dir']))
         #same for the fa, md, ad, rd
-        script.write("time singularity run -B {}:{} {} mrgrid {}/dwmri_tensor_fa.nii.gz regrid {}/dwmri_tensor_fa_1mm_iso.nii.gz -voxel 1\n".format(kwargs['temp_dir'],kwargs['temp_dir'], mrtrix_simg, kwargs['temp_dir'], kwargs['temp_dir']))
-        script.write("time singularity run -B {}:{} {} mrgrid {}/dwmri_tensor_md.nii.gz regrid {}/dwmri_tensor_md_1mm_iso.nii.gz -voxel 1\n".format(kwargs['temp_dir'],kwargs['temp_dir'], mrtrix_simg, kwargs['temp_dir'], kwargs['temp_dir']))
-        script.write("time singularity run -B {}:{} {} mrgrid {}/dwmri_tensor_ad.nii.gz regrid {}/dwmri_tensor_ad_1mm_iso.nii.gz -voxel 1\n".format(kwargs['temp_dir'],kwargs['temp_dir'], mrtrix_simg, kwargs['temp_dir'], kwargs['temp_dir']))
-        script.write("time singularity run -B {}:{} {} mrgrid {}/dwmri_tensor_rd.nii.gz regrid {}/dwmri_tensor_rd_1mm_iso.nii.gz -voxel 1\n".format(kwargs['temp_dir'],kwargs['temp_dir'], mrtrix_simg, kwargs['temp_dir'], kwargs['temp_dir']))
+        script.write("time singularity run -e --contain -B /tmp:/tmp -B {}:{} {} mrgrid {}/dwmri_tensor_fa.nii.gz regrid {}/dwmri_tensor_fa_1mm_iso.nii.gz -voxel 1\n".format(kwargs['temp_dir'],kwargs['temp_dir'], mrtrix_simg, kwargs['temp_dir'], kwargs['temp_dir']))
+        script.write("time singularity run -e --contain -B /tmp:/tmp -B {}:{} {} mrgrid {}/dwmri_tensor_md.nii.gz regrid {}/dwmri_tensor_md_1mm_iso.nii.gz -voxel 1\n".format(kwargs['temp_dir'],kwargs['temp_dir'], mrtrix_simg, kwargs['temp_dir'], kwargs['temp_dir']))
+        script.write("time singularity run -e --contain -B /tmp:/tmp -B {}:{} {} mrgrid {}/dwmri_tensor_ad.nii.gz regrid {}/dwmri_tensor_ad_1mm_iso.nii.gz -voxel 1\n".format(kwargs['temp_dir'],kwargs['temp_dir'], mrtrix_simg, kwargs['temp_dir'], kwargs['temp_dir']))
+        script.write("time singularity run -e --contain -B /tmp:/tmp -B {}:{} {} mrgrid {}/dwmri_tensor_rd.nii.gz regrid {}/dwmri_tensor_rd_1mm_iso.nii.gz -voxel 1\n".format(kwargs['temp_dir'],kwargs['temp_dir'], mrtrix_simg, kwargs['temp_dir'], kwargs['temp_dir']))
 
         script.write("echo Done resampling to 1mm iso. Now running TractSeg...\n")
         script.write('echo "..............................................................................."\n')
@@ -2441,7 +2441,7 @@ class TractsegGenerator(ScriptGenerator):
         script.write("export FSL_DIR=/accre/arch/easybuild/software/MPI/GCC/6.4.0-2.28/OpenMPI/2.1.1/FSL/5.0.10/fsl\n")
         script.write("source setup_accre_runtime_dir\n")
 
-        script.write("time singularity run -B {}:{} -B {}:{} {} TractSeg -i {}/dwmri_1mm_iso.nii.gz --raw_diffusion_input -o {}/tractseg --bvals {}/dwmri.bval --bvecs {}/dwmri.bvec\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir']))
+        script.write("time singularity run -e --contain -B /tmp:/tmp -B {}:{} -B {}:{} {} TractSeg -i {}/dwmri_1mm_iso.nii.gz --raw_diffusion_input -o {}/tractseg --bvals {}/dwmri.bval --bvecs {}/dwmri.bvec\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir']))
         script.write('if [[ -f "{}/tractseg/peaks.nii.gz" ]]; then echo "Successfully created peaks.nii.gz for {}"; error_flag=0; else echo "Improper bvalue/bvector distribution for {}"; error_flag=1; fi\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir']))
         script.write('if [[ $error_flag -eq 1 ]]; then echo "Improper bvalue/bvector distribution for {}" >> {}/report_bad_bvector.txt; fi\n\n'.format(kwargs['temp_dir'], kwargs['temp_dir']))        
 
@@ -2450,9 +2450,9 @@ class TractsegGenerator(ScriptGenerator):
         script.write("exit 1\n")
         script.write("fi\n\n")
 
-        script.write("time singularity run -B {}:{} -B {}:{} {} TractSeg -i {}/tractseg/peaks.nii.gz -o {}/tractseg --output_type endings_segmentation\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, kwargs['temp_dir'], kwargs['temp_dir']))
-        script.write("time singularity run -B {}:{} -B {}:{} {} TractSeg -i {}/tractseg/peaks.nii.gz -o {}/tractseg --output_type TOM\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, kwargs['temp_dir'], kwargs['temp_dir']))
-        script.write("time singularity run -B {}:{} -B {}:{} {} Tracking -i {}/tractseg/peaks.nii.gz -o {}/tractseg --tracking_format tck\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, kwargs['temp_dir'], kwargs['temp_dir']))
+        script.write("time singularity run -e --contain -B /tmp:/tmp -B {}:{} -B {}:{} {} TractSeg -i {}/tractseg/peaks.nii.gz -o {}/tractseg --output_type endings_segmentation\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, kwargs['temp_dir'], kwargs['temp_dir']))
+        script.write("time singularity run -e --contain -B /tmp:/tmp -B {}:{} -B {}:{} {} TractSeg -i {}/tractseg/peaks.nii.gz -o {}/tractseg --output_type TOM\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, kwargs['temp_dir'], kwargs['temp_dir']))
+        script.write("time singularity run -e --contain -B /tmp:/tmp -B {}:{} -B {}:{} {} Tracking -i {}/tractseg/peaks.nii.gz -o {}/tractseg --tracking_format tck\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, kwargs['temp_dir'], kwargs['temp_dir']))
 
         script.write('echo "..............................................................................."\n')
         script.write("echo Done running TractSeg. Now computing measures per bundle...\n")
@@ -2460,8 +2460,8 @@ class TractsegGenerator(ScriptGenerator):
 
         script.write("for i in {}/tractseg/TOM_trackings/*.tck; do\n".format(kwargs['temp_dir']))
         script.write('    echo "$i"; s=${i##*/}; s=${s%.tck}; echo $s;\n')
-        script.write('    time singularity exec -B {}:{} --nv {} scil_evaluate_bundles_individual_measures.py {}/tractseg/TOM_trackings/$s.tck {}/tractseg/measures/$s-SHAPE.json --reference={}/dwmri_1mm_iso.nii.gz\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], scilus_simg, kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir']))
-        script.write('    time singularity exec -B {}:{} --nv {} scil_compute_bundle_mean_std.py {}/tractseg/TOM_trackings/$s.tck {}/dwmri_tensor_fa_1mm_iso.nii.gz {}/dwmri_tensor_md_1mm_iso.nii.gz {}/dwmri_tensor_ad_1mm_iso.nii.gz {}/dwmri_tensor_rd_1mm_iso.nii.gz --density_weighting --reference={}/dwmri_1mm_iso.nii.gz > {}/tractseg/measures/$s-DTI.json\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], scilus_simg, kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir']))
+        script.write('    time singularity exec -e --contain -B /tmp:/tmp -B {}:{} --nv {} scil_evaluate_bundles_individual_measures.py {}/tractseg/TOM_trackings/$s.tck {}/tractseg/measures/$s-SHAPE.json --reference={}/dwmri_1mm_iso.nii.gz\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], scilus_simg, kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir']))
+        script.write('    time singularity exec -e --contain -B /tmp:/tmp -B {}:{} --nv {} scil_compute_bundle_mean_std.py {}/tractseg/TOM_trackings/$s.tck {}/dwmri_tensor_fa_1mm_iso.nii.gz {}/dwmri_tensor_md_1mm_iso.nii.gz {}/dwmri_tensor_ad_1mm_iso.nii.gz {}/dwmri_tensor_rd_1mm_iso.nii.gz --density_weighting --reference={}/dwmri_1mm_iso.nii.gz > {}/tractseg/measures/$s-DTI.json\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], scilus_simg, kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir']))
         script.write('done\n\n')
 
         script.write("echo Done computing measures per bundle. Now deleting temp inputs and re-organizing outputs...\n")
@@ -2722,15 +2722,15 @@ class NODDIGenerator(ScriptGenerator):
 
         script.write("echo Running setup for NODDI...\n")
         script.write("echo Renaming dwi for some reason...\n")
-        script.write("singularity exec {} mrconvert {}/dwmri.nii.gz {}/Diffusion.nii.gz -force\n".format(self.setup.simg, session_input, session_input))
+        script.write("singularity exec -e --contain -B /tmp:/tmp -B {}:{} {} mrconvert {}/dwmri.nii.gz {}/Diffusion.nii.gz -force\n".format(session_input, session_input, self.setup.simg, session_input, session_input))
         script.write("mask=dwimean_masked_mask.nii.gz\n")
         if not kwargs['dwi_mask']:
             script.write("echo DWI mask not found. Creating dwi mask using Kurts method...\n")
-            script.write("singularity exec {} scil_extract_dwi_shell.py {}/Diffusion.nii.gz {}/Diffusion.bval {}/Diffusion.bvec 750 {}/dwi_tmp.nii.gz {}/bvals_tmp {}/bvecs_tmp -f -v --tolerance 650\n".format(self.setup.simg, session_input, session_input, session_input, session_input, session_input, session_input))
-            script.write("singularity exec {} mrmath {}/dwi_tmp.nii.gz mean {}/dwimean.nii.gz -axis 3 -force\n".format(self.setup.simg, session_input, session_input))
+            script.write("singularity exec -e --contain -B /tmp:/tmp -B {}:{} {} scil_extract_dwi_shell.py {}/Diffusion.nii.gz {}/Diffusion.bval {}/Diffusion.bvec 750 {}/dwi_tmp.nii.gz {}/bvals_tmp {}/bvecs_tmp -f -v --tolerance 650\n".format(session_input, session_input, self.setup.simg, session_input, session_input, session_input, session_input, session_input, session_input))
+            script.write("singularity exec -e --contain -B /tmp:/tmp -B {}:{} {} mrmath {}/dwi_tmp.nii.gz mean {}/dwimean.nii.gz -axis 3 -force\n".format(session_input, session_input, self.setup.simg, session_input, session_input))
             script.write("bet {}/dwimean.nii.gz {}/dwimean_masked -m -R -f .3\n".format(session_input, session_input))
         script.write("echo Done running setup. Now running NODDI...\n")
-        script.write("singularity exec {} scil_compute_NODDI.py {}/Diffusion.nii.gz {}/Diffusion.bval {}/Diffusion.bvec --out_dir {} --mask {}/dwimean_masked_mask.nii.gz -f\n".format(self.setup.simg, session_input, session_input, session_input, session_output, session_input))
+        script.write("singularity exec -e --contain -B /tmp:/tmp -B {}:{} -B {}:{} {} scil_compute_NODDI.py {}/Diffusion.nii.gz {}/Diffusion.bval {}/Diffusion.bvec --out_dir {} --mask {}/dwimean_masked_mask.nii.gz -f\n".format(session_input, session_input, session_output, session_output, self.setup.simg, session_input, session_input, session_input, session_output, session_input))
         script.write("echo Finished running NODDI. Now removing inputs and copying outputs back...\n")
 
     def generate_noddi_scripts(self):
@@ -2908,7 +2908,7 @@ class DWI_plus_TractsegGenerator(ScriptGenerator):
         script.write("echo Making temp directories...\n")
         script.write("mkdir -p {}\n".format(dti_dir))
         script.write("echo Shelling to 1500...\n")
-        script.write("time singularity exec -B {} -B {} {} python3 /CODE/extract_single_shell.py\n".format(bind1, bind2, dwi_simg))
+        script.write("time singularity exec -e --contain -B /tmp:tmp -B {} -B {} {} python3 /CODE/extract_single_shell.py\n".format(bind1, bind2, dwi_simg))
         script.write("echo Done shelling to 1500. Now fitting tensors DTI...\n")
 
         #1.) extract the b0
@@ -2918,40 +2918,40 @@ class DWI_plus_TractsegGenerator(ScriptGenerator):
 
         script.write("echo Extracting b0...\n")
         b0 = "{}/dwmri_b0.nii.gz".format(dti_dir)
-        script.write("time singularity exec -B {}:{} {} bash -c \"dwiextract {}/dwmri.nii.gz -fslgrad {}/dwmri.bvec {}/dwmri.bval - -bzero | mrmath - mean {} -axis 3\"\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], b0))
+        script.write("time singularity exec -e --contain -B /tmp:tmp -B {}:{} {} bash -c \"dwiextract {}/dwmri.nii.gz -fslgrad {}/dwmri.bvec {}/dwmri.bval - -bzero | mrmath - mean {} -axis 3\"\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], b0))
         script.write("echo Creating mask...\n")
         mask = "{}/dwmri_mask.nii.gz".format(dti_dir)
-        script.write("time singularity exec -B {}:{} {} bet {} {} -f 0.25 -m -n -R\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, b0, mask))
+        script.write("time singularity exec -e --contain -B /tmp:tmp -B {}:{} {} bet {} {} -f 0.25 -m -n -R\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, b0, mask))
         script.write("echo Fitting tensors...\n")
         shellbvec = "{}/dwmri%firstshell.bvec".format(dti_dir)
         shellbval = "{}/dwmri%firstshell.bval".format(dti_dir)
         shellnii = "{}/dwmri%firstshell.nii.gz".format(dti_dir)
         tensor = "{}/dwmri_tensor.nii.gz".format(dti_dir)
-        script.write("time singularity exec -B {}:{} {} dwi2tensor -fslgrad {} {} {} {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, shellbvec, shellbval, shellnii, tensor))
+        script.write("time singularity exec -e --contain -B /tmp:tmp -B {}:{} {} dwi2tensor -fslgrad {} {} {} {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, shellbvec, shellbval, shellnii, tensor))
         script.write("echo Calculating FA, MD, AD, RD...\n")
         fa = "{}/dwmri_tensor_fa.nii.gz".format(dti_dir)
         md = "{}/dwmri_tensor_md.nii.gz".format(dti_dir)
         ad = "{}/dwmri_tensor_ad.nii.gz".format(dti_dir)
         rd = "{}/dwmri_tensor_rd.nii.gz".format(dti_dir)
-        script.write("time singularity exec -B {}:{} {} tensor2metric {} -fa {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, tensor, fa, mask))
-        script.write("time singularity exec -B {}:{} {} tensor2metric {} -adc {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, tensor, md, mask))
-        script.write("time singularity exec -B {}:{} {} tensor2metric {} -ad {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, tensor, ad, mask))
-        script.write("time singularity exec -B {}:{} {} tensor2metric {} -rd {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, tensor, rd, mask))
+        script.write("time singularity exec -e --contain -B /tmp:tmp -B {}:{} {} tensor2metric {} -fa {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, tensor, fa, mask))
+        script.write("time singularity exec -e --contain -B /tmp:tmp -B {}:{} {} tensor2metric {} -adc {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, tensor, md, mask))
+        script.write("time singularity exec -e --contain -B /tmp:tmp -B {}:{} {} tensor2metric {} -ad {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, tensor, ad, mask))
+        script.write("time singularity exec -e --contain -B /tmp:tmp -B {}:{} {} tensor2metric {} -rd {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, tensor, rd, mask))
         
         #### NEED TO REWRITE THE REST BELOW TO USE THE DTI OUTPUTS STRUCTURED AS ABOVE
 
         script.write("echo Resampling to 1mm iso...\n")
         isodwi = "{}/dwmri_1mm_iso.nii.gz".format(kwargs['temp_dir'])
-        script.write("time singularity run -B {}:{} {} mrgrid {}/dwmri.nii.gz regrid {} -voxel 1\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, kwargs['temp_dir'], isodwi))
+        script.write("time singularity run -e --contain -B /tmp:tmp -B {}:{} {} mrgrid {}/dwmri.nii.gz regrid {} -voxel 1\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, kwargs['temp_dir'], isodwi))
         #same for the fa, md, ad, rd
         faiso = "{}/dwmri_tensor_fa_1mm_iso.nii.gz".format(dti_dir)
         mdiso = "{}/dwmri_tensor_md_1mm_iso.nii.gz".format(dti_dir)
         adiso = "{}/dwmri_tensor_ad_1mm_iso.nii.gz".format(dti_dir)
         rdiso = "{}/dwmri_tensor_rd_1mm_iso.nii.gz".format(dti_dir)
-        script.write("time singularity run -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, mrtrix_simg, fa, faiso))
-        script.write("time singularity run -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, mrtrix_simg, md, mdiso))
-        script.write("time singularity run -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, mrtrix_simg, ad, adiso))
-        script.write("time singularity run -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, mrtrix_simg, rd, rdiso))
+        script.write("time singularity run -e --contain -B /tmp:tmp -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, mrtrix_simg, fa, faiso))
+        script.write("time singularity run -e --contain -B /tmp:tmp -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, mrtrix_simg, md, mdiso))
+        script.write("time singularity run -e --contain -B /tmp:tmp -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, mrtrix_simg, ad, adiso))
+        script.write("time singularity run -e --contain -B /tmp:tmp -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, mrtrix_simg, rd, rdiso))
 
         script.write("echo Done resampling to 1mm iso. Now running TractSeg...\n")
         script.write('echo "..............................................................................."\n')
@@ -2962,7 +2962,7 @@ class DWI_plus_TractsegGenerator(ScriptGenerator):
             script.write("source setup_accre_runtime_dir\n")
 
         tractsegdir = "{}/tractseg".format(kwargs['temp_dir'])
-        script.write("time singularity run -B {}:{} -B {}:{} {} TractSeg -i {} --raw_diffusion_input -o {} --bvals {}/dwmri.bval --bvecs {}/dwmri.bvec\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, isodwi, tractsegdir, kwargs['temp_dir'], kwargs['temp_dir']))
+        script.write("time singularity run -e --contain -B /tmp:tmp -B {}:{} -B {}:{} {} TractSeg -i {} --raw_diffusion_input -o {} --bvals {}/dwmri.bval --bvecs {}/dwmri.bvec\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, isodwi, tractsegdir, kwargs['temp_dir'], kwargs['temp_dir']))
         script.write('if [[ -f "{}/peaks.nii.gz" ]]; then echo "Successfully created peaks.nii.gz for {}"; error_flag=0; else echo "Improper bvalue/bvector distribution for {}"; error_flag=1; fi\n'.format(tractsegdir, kwargs['temp_dir'], kwargs['temp_dir']))
         script.write('if [[ $error_flag -eq 1 ]]; then echo "Improper bvalue/bvector distribution for {}" >> {}/report_bad_bvector.txt; fi\n\n'.format(kwargs['temp_dir'], kwargs['temp_dir']))        
 
@@ -2971,9 +2971,9 @@ class DWI_plus_TractsegGenerator(ScriptGenerator):
         script.write("exit 1\n")
         script.write("fi\n\n")
 
-        script.write("time singularity run -B {}:{} -B {}:{} {} TractSeg -i {}/peaks.nii.gz -o {} --output_type endings_segmentation\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, tractsegdir, tractsegdir))
-        script.write("time singularity run -B {}:{} -B {}:{} {} TractSeg -i {}/peaks.nii.gz -o {} --output_type TOM\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, tractsegdir, tractsegdir))
-        script.write("time singularity run -B {}:{} -B {}:{} {} Tracking -i {}/peaks.nii.gz -o {} --tracking_format tck\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, tractsegdir, tractsegdir))
+        script.write("time singularity run -e --contain -B /tmp:tmp -B {}:{} -B {}:{} {} TractSeg -i {}/peaks.nii.gz -o {} --output_type endings_segmentation\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, tractsegdir, tractsegdir))
+        script.write("time singularity run -e --contain -B /tmp:tmp -B {}:{} -B {}:{} {} TractSeg -i {}/peaks.nii.gz -o {} --output_type TOM\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, tractsegdir, tractsegdir))
+        script.write("time singularity run -e --contain -B /tmp:tmp -B {}:{} -B {}:{} {} Tracking -i {}/peaks.nii.gz -o {} --tracking_format tck\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, tractsegdir, tractsegdir))
 
         script.write('echo "..............................................................................."\n')
         script.write("echo Done running TractSeg. Now computing measures per bundle...\n")
@@ -2983,8 +2983,8 @@ class DWI_plus_TractsegGenerator(ScriptGenerator):
         measuresdir = "{}/measures".format(tractsegdir)
         script.write("for i in {}/TOM_trackings/*.tck; do\n".format(tractsegdir))
         script.write('    echo "$i"; s=${i##*/}; s=${s%.tck}; echo $s;\n')
-        script.write('    time singularity exec -B {}:{} --nv {} scil_evaluate_bundles_individual_measures.py {}/$s.tck {}/$s-SHAPE.json --reference={}\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], scilus_simg, trackingdir, measuresdir, isodwi))
-        script.write('    time singularity exec -B {}:{} --nv {} scil_compute_bundle_mean_std.py {}/$s.tck {} {} {} {} --density_weighting --reference={} > {}/$s-DTI.json\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], scilus_simg, trackingdir, faiso, mdiso, adiso, rdiso, isodwi, measuresdir))
+        script.write('    time singularity exec -e --contain -B /tmp:tmp -B {}:{} --nv {} scil_evaluate_bundles_individual_measures.py {}/$s.tck {}/$s-SHAPE.json --reference={}\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], scilus_simg, trackingdir, measuresdir, isodwi))
+        script.write('    time singularity exec -e --contain -B /tmp:tmp -B {}:{} --nv {} scil_compute_bundle_mean_std.py {}/$s.tck {} {} {} {} --density_weighting --reference={} > {}/$s-DTI.json\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], scilus_simg, trackingdir, faiso, mdiso, adiso, rdiso, isodwi, measuresdir))
         script.write('done\n\n')
 
         script.write("echo Done computing measures per bundle. Now deleting temp inputs and re-organizing outputs...\n")
@@ -3107,7 +3107,7 @@ class BedpostX_plus_DWI_plus_TractsegGenerator(ScriptGenerator):
         script.write("echo Making temp directories...\n")
         script.write("mkdir -p {}\n".format(dti_dir))
         script.write("echo Shelling to 1500...\n")
-        script.write("time singularity exec -B {} -B {} {} python3 /CODE/extract_single_shell.py\n".format(bind1, bind2, dwi_simg))
+        script.write("time singularity exec -e --contain -B /tmp:tmp -B {} -B {} {} python3 /CODE/extract_single_shell.py\n".format(bind1, bind2, dwi_simg))
         script.write("echo Done shelling to 1500. Now fitting tensors DTI...\n")
 
         #1.) extract the b0
@@ -3117,40 +3117,40 @@ class BedpostX_plus_DWI_plus_TractsegGenerator(ScriptGenerator):
 
         script.write("echo Extracting b0...\n")
         b0 = "{}/dwmri_b0.nii.gz".format(dti_dir)
-        script.write("time singularity exec -B {}:{} {} bash -c \"dwiextract {}/dwmri.nii.gz -fslgrad {}/dwmri.bvec {}/dwmri.bval - -bzero | mrmath - mean {} -axis 3\"\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], b0))
+        script.write("time singularity exec -e --contain -B /tmp:tmp -B {}:{} {} bash -c \"dwiextract {}/dwmri.nii.gz -fslgrad {}/dwmri.bvec {}/dwmri.bval - -bzero | mrmath - mean {} -axis 3\"\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], b0))
         script.write("echo Creating mask...\n")
         mask = "{}/dwmri_mask.nii.gz".format(dti_dir)
-        script.write("time singularity exec -B {}:{} {} bet {} {} -f 0.25 -m -n -R\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, b0, mask))
+        script.write("time singularity exec -e --contain -B /tmp:tmp -B {}:{} {} bet {} {} -f 0.25 -m -n -R\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, b0, mask))
         script.write("echo Fitting tensors...\n")
         shellbvec = "{}/dwmri%firstshell.bvec".format(dti_dir)
         shellbval = "{}/dwmri%firstshell.bval".format(dti_dir)
         shellnii = "{}/dwmri%firstshell.nii.gz".format(dti_dir)
         tensor = "{}/dwmri_tensor.nii.gz".format(dti_dir)
-        script.write("time singularity exec -B {}:{} {} dwi2tensor -fslgrad {} {} {} {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, shellbvec, shellbval, shellnii, tensor))
+        script.write("time singularity exec -e --contain -B /tmp:tmp -B {}:{} {} dwi2tensor -fslgrad {} {} {} {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, shellbvec, shellbval, shellnii, tensor))
         script.write("echo Calculating FA, MD, AD, RD...\n")
         fa = "{}/dwmri_tensor_fa.nii.gz".format(dti_dir)
         md = "{}/dwmri_tensor_md.nii.gz".format(dti_dir)
         ad = "{}/dwmri_tensor_ad.nii.gz".format(dti_dir)
         rd = "{}/dwmri_tensor_rd.nii.gz".format(dti_dir)
-        script.write("time singularity exec -B {}:{} {} tensor2metric {} -fa {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, tensor, fa, mask))
-        script.write("time singularity exec -B {}:{} {} tensor2metric {} -adc {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, tensor, md, mask))
-        script.write("time singularity exec -B {}:{} {} tensor2metric {} -ad {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, tensor, ad, mask))
-        script.write("time singularity exec -B {}:{} {} tensor2metric {} -rd {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, tensor, rd, mask))
+        script.write("time singularity exec -e --contain -B /tmp:tmp -B {}:{} {} tensor2metric {} -fa {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, tensor, fa, mask))
+        script.write("time singularity exec -e --contain -B /tmp:tmp -B {}:{} {} tensor2metric {} -adc {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, tensor, md, mask))
+        script.write("time singularity exec -e --contain -B /tmp:tmp -B {}:{} {} tensor2metric {} -ad {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, tensor, ad, mask))
+        script.write("time singularity exec -e --contain -B /tmp:tmp -B {}:{} {} tensor2metric {} -rd {} -mask {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, tensor, rd, mask))
         
         #### NEED TO REWRITE THE REST BELOW TO USE THE DTI OUTPUTS STRUCTURED AS ABOVE
 
         script.write("echo Resampling to 1mm iso...\n")
         isodwi = "{}/dwmri_1mm_iso.nii.gz".format(kwargs['temp_dir'])
-        script.write("time singularity exec -B {}:{} {} mrgrid {}/dwmri.nii.gz regrid {} -voxel 1\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, kwargs['temp_dir'], isodwi))
+        script.write("time singularity exec -e --contain -B /tmp:tmp -B {}:{} {} mrgrid {}/dwmri.nii.gz regrid {} -voxel 1\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, kwargs['temp_dir'], isodwi))
         #same for the fa, md, ad, rd
         faiso = "{}/dwmri_tensor_fa_1mm_iso.nii.gz".format(dti_dir)
         mdiso = "{}/dwmri_tensor_md_1mm_iso.nii.gz".format(dti_dir)
         adiso = "{}/dwmri_tensor_ad_1mm_iso.nii.gz".format(dti_dir)
         rdiso = "{}/dwmri_tensor_rd_1mm_iso.nii.gz".format(dti_dir)
-        script.write("time singularity exec -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, dwi_simg, fa, faiso))
-        script.write("time singularity exec -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, dwi_simg, md, mdiso))
-        script.write("time singularity exec -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, dwi_simg, ad, adiso))
-        script.write("time singularity exec -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, dwi_simg, rd, rdiso))
+        script.write("time singularity exec -e --contain -B /tmp:tmp -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, dwi_simg, fa, faiso))
+        script.write("time singularity exec -e --contain -B /tmp:tmp -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, dwi_simg, md, mdiso))
+        script.write("time singularity exec -e --contain -B /tmp:tmp -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, dwi_simg, ad, adiso))
+        script.write("time singularity exec -e --contain -B /tmp:tmp -B {}:{} {} mrgrid {} regrid {} -voxel 1\n".format(dti_dir, dti_dir, dwi_simg, rd, rdiso))
 
         #now, we need to run bedpostX on the input data
         script.write("echo Running bedpostX...\n")
@@ -3165,8 +3165,8 @@ class BedpostX_plus_DWI_plus_TractsegGenerator(ScriptGenerator):
         script.write("ln -s {}/dwmri.bval {}/bvals\n".format(kwargs['temp_dir'], bedpostinput))
 
         #create the bedpostX mask
-        script.write("time singularity exec -B {indir}:{indir} -B {tempdir}:{tempdir} {mrtrix} bash -c \"dwiextract {indir}/data.nii.gz -fslgrad {indir}/bvecs {indir}/bvals - -bzero | mrmath - mean {indir}/b0.nii.gz -axis 3\"\n".format(indir=bedpostinput, mrtrix=dwi_simg, tempdir=kwargs['temp_dir']))
-        script.write("time singularity exec -B {indir}:{indir} {mrtrix} bet {indir}/b0.nii.gz {indir}/b0_masked -m -R -f .3\n".format(indir=bedpostinput, mrtrix=dwi_simg))
+        script.write("time singularity exec -e --contain -B /tmp:tmp -B {indir}:{indir} -B {tempdir}:{tempdir} {mrtrix} bash -c \"dwiextract {indir}/data.nii.gz -fslgrad {indir}/bvecs {indir}/bvals - -bzero | mrmath - mean {indir}/b0.nii.gz -axis 3\"\n".format(indir=bedpostinput, mrtrix=dwi_simg, tempdir=kwargs['temp_dir']))
+        script.write("time singularity exec -e --contain -B /tmp:tmp -B {indir}:{indir} {mrtrix} bet {indir}/b0.nii.gz {indir}/b0_masked -m -R -f .3\n".format(indir=bedpostinput, mrtrix=dwi_simg))
         script.write("rm {indir}/b0_masked.nii.gz\n".format(indir=bedpostinput))
         script.write("mv {indir}/b0_masked_mask.nii.gz {indir}/nodif_brain_mask.nii.gz\n".format(indir=bedpostinput))
 
@@ -3174,7 +3174,7 @@ class BedpostX_plus_DWI_plus_TractsegGenerator(ScriptGenerator):
         if self.setup.args.accre_gpu:
             script.write("time singularity exec --nv -e --contain -B {indir}:{indir} -B {parent}:{parent} {fsl} bedpostx_gpu {indir}\n".format(indir=bedpostinput, fsl=ts_simg, parent=kwargs['temp_dir']))
         else:
-            script.write("time singularity exec -B {indir}:{indir} -B {parent}:{parent} {fsl} bedpostx {indir}\n".format(indir=bedpostinput, fsl=dwi_simg, parent=kwargs['temp_dir']))
+            script.write("time singularity exec -e --contain -B /tmp:tmp -B {indir}:{indir} -B {parent}:{parent} {fsl} bedpostx {indir}\n".format(indir=bedpostinput, fsl=dwi_simg, parent=kwargs['temp_dir']))
         bedpost_ouputs = "{}/bedpostXinputs.bedpostX".format(kwargs['temp_dir'])
 
         #removing links
@@ -3215,8 +3215,8 @@ class BedpostX_plus_DWI_plus_TractsegGenerator(ScriptGenerator):
         measuresdir = "{}/measures".format(tractsegdir)
         script.write("for i in {}/TOM_trackings/*.tck; do\n".format(tractsegdir))
         script.write('    echo "$i"; s=${i##*/}; s=${s%.tck}; echo $s;\n')
-        script.write('    time singularity exec -B {}:{} -e --contain --nv {} scil_evaluate_bundles_individual_measures.py {}/$s.tck {}/$s-SHAPE.json --reference={}\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], scilus_simg, trackingdir, measuresdir, isodwi))
-        script.write('    time singularity exec -B {}:{} -e --contain --nv {} scil_compute_bundle_mean_std.py {}/$s.tck {} {} {} {} --density_weighting --reference={} > {}/$s-DTI.json\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], scilus_simg, trackingdir, faiso, mdiso, adiso, rdiso, isodwi, measuresdir))
+        script.write('    time singularity exec -e --contain -B /tmp:tmp -B {}:{} -e --contain --nv {} scil_evaluate_bundles_individual_measures.py {}/$s.tck {}/$s-SHAPE.json --reference={}\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], scilus_simg, trackingdir, measuresdir, isodwi))
+        script.write('    time singularity exec -e --contain -B /tmp:tmp -B {}:{} -e --contain --nv {} scil_compute_bundle_mean_std.py {}/$s.tck {} {} {} {} --density_weighting --reference={} > {}/$s-DTI.json\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], scilus_simg, trackingdir, faiso, mdiso, adiso, rdiso, isodwi, measuresdir))
         script.write('done\n\n')
 
         script.write("echo Done computing measures per bundle. Now deleting temp inputs and re-organizing outputs...\n")
