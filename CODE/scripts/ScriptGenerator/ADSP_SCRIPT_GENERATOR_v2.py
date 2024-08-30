@@ -1637,7 +1637,7 @@ class SLANT_TICVGenerator(ScriptGenerator):
         eb4 = "\"{}/\":/opt/slant/dl/working_dir".format(kwargs['dl'])
         eb5 = "\"{}/\":/opt/slant/matlab/output_post".format(kwargs['post'])
 
-        script.write("singularity exec -B {} -B {} -B {} -B {} -B {} -B /tmp:/tmp -e {} /opt/slant/run.sh\n".format(eb1, eb2, eb3, eb4, eb5, self.setup.simg))
+        script.write("singularity exec -e --contain -B {} -B {} -B {} -B {} -B {} -B /tmp:/tmp --home {} -B ~/.bashrc:/{}/.bashrc {} /opt/slant/run.sh\n".format(eb1, eb2, eb3, eb4, eb5, session_input, session_input, self.setup.simg))
         script.write("echo Finished running SLANT-TICV. Now removing pre and dl directories...\n")
         script.write("rm -r {}/*\n".format(kwargs['pre']))
         script.write("rm -r {}/*\n".format(kwargs['dl']))
@@ -2089,7 +2089,10 @@ class MaCRUISEGenerator(ScriptGenerator):
         """
 
         script.write("echo Running MaCRUISE...\n")
-        script.write("singularity exec -B {}:/INPUTS -B {}:/OUTPUTS {} xvfb-run -a --server-args=-screen 3 1920x1200x24 -ac +extension GLX /extra/MaCRUISE_v3_2_0_classern /extra/MaCRUISE_v3_2_0_classern\n".format(session_input, session_output, self.setup.simg))
+        script.write("singularity exec -e --contain --home {} -B {}:/INPUTS -B {}:/OUTPUTS -B /tmp:/tmp -B {}:/dev/shm {} xvfb-run -a --server-args=\"-screen 3 1920x1200x24 -ac +extension GLX\" /extra/MaCRUISE_v3_2_0_classern\n".format(session_input, session_input, session_output, session_input, self.setup.simg))
+        script.write("echo Now deleting temporary outputs and changing output structure...\n")
+        script.write("find {}/MaCRUISE -mindepth 1 -maxdepth 1 -type d ! -name 'Output' -exec rm -r {{}} +\n".format(session_output))
+        script.write("mv {}/MaCRUISE/Output {}/\n".format(session_output, session_output))
         script.write("echo Finished running MaCRUISE. Now removing inputs and copying outputs back...\n")
 
     def generate_macruise_scripts(self):
