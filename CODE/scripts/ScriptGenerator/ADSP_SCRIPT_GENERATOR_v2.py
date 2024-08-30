@@ -1637,7 +1637,11 @@ class SLANT_TICVGenerator(ScriptGenerator):
         eb4 = "\"{}/\":/opt/slant/dl/working_dir".format(kwargs['dl'])
         eb5 = "\"{}/\":/opt/slant/matlab/output_post".format(kwargs['post'])
 
-        script.write("singularity exec -e --contain -B {} -B {} -B {} -B {} -B {} -B /tmp:/tmp --home {} -B ~/.bashrc:/{}/.bashrc {} /opt/slant/run.sh\n".format(eb1, eb2, eb3, eb4, eb5, session_input, session_input, self.setup.simg))
+        #add an empty file and make it executable (for the stupid bashrc source for whatever reason)
+        empty_file = session_input/'empty.sh'
+        script.write("touch {}\n".format(empty_file))
+        script.write("chmod +x {}\n".format(empty_file))
+        script.write("singularity exec -e --contain -B {} -B {} -B {} -B {} -B {} -B /tmp:/tmp --home {} -B {}:{}/.bashrc {} /opt/slant/run.sh\n".format(eb1, eb2, eb3, eb4, eb5, session_input, empty_file, session_input, self.setup.simg))
         script.write("echo Finished running SLANT-TICV. Now removing pre and dl directories...\n")
         script.write("rm -r {}/*\n".format(kwargs['pre']))
         script.write("rm -r {}/*\n".format(kwargs['dl']))
