@@ -47,7 +47,7 @@ def pa():
     p.add_argument('--vunetID', type=str, help="VUnetID of the user running the pipeline. Necessary for scp to ACCRE. Default will pull from bash.")
     p.add_argument('--custom_output_dir', default='', type=str, help="path to directory where you want to write the outputs of the pipeline. If empty string, then the output will be written to the nfs2 directories.")
     p.add_argument('--freesurfer_license_path', default='', type=str, help="path to the freesurfer license file. Necessary for PreQual and Biscuit pipelines.")
-    p.add_argument('--skull_stripped', action='store_true', help="For UNest: if you want to run it with the skull stripped T1")
+    p.add_argument('--skull_stripped', action='store_true', help="For UNest: if you want to run it with the skull stripped T1; Also for PreQual if you want to skull trip the T1 for synb0")
     p.add_argument('--working_dir', type=str, default='', help="Required for UNest: path tp where you want the root working directory to be")
     p.add_argument('--temp_dir', type=str, default='', help="Required for UNest and tractseg: path to where you want the root temp directory to be")
     p.add_argument('--no_slurm', action='store_true', help="Set if you do not want to generate a slurm script for the pipeline")
@@ -730,17 +730,19 @@ class ScriptGenerator:
         Checks to see if the freewater outputs exist in a directory
         """
 
-        fa = freewater_dir/("freewater_fa.nii.gz")
-        md = freewater_dir/("freewater_md.nii.gz")
-        rd = freewater_dir/("freewater_rd.nii.gz")
-        ad = freewater_dir/("freewater_ad.nii.gz")
+        fa = freewater_dir/("freewater_single_fa.nii.gz")
+        md = freewater_dir/("freewater_single_md.nii.gz")
+        rd = freewater_dir/("freewater_single_rd.nii.gz")
+        ad = freewater_dir/("freewater_single_ad.nii.gz")
         #for some reason, these are output differently for single vs multishell
-        fw = freewater_dir/("freewater.nii.gz")
-        frac = freewater_dir/("freewater_fraction.nii.gz")
+        fw = freewater_dir/("freewater_single.nii.gz")
+        #frac = freewater_dir/("freewater_fraction.nii.gz")
 
-        if not fa.exists() or not md.exists() or not rd.exists() or not ad.exists() or (not fw.exists() and not frac.exists()):
-            return False
-    
+        multis = [(x.parent) / x.name.replace('single', 'multi') for x in [fa, md, rd, ad, fw]]
+
+        if not fa.exists() or not md.exists() or not rd.exists() or not ad.exists() or not fw.exists():
+            if not all([x.exists() for x in multis]):
+                return False
         return True
 
 
@@ -1334,6 +1336,9 @@ class PreQualGenerator(ScriptGenerator):
         else:
             opts = '--topup_first_b0s_only'
 
+        if self.setup.args.skull_stripped:
+            opts += ' --synb0 stripped'
+
         #write the dtiQA_config.csv file (iterate over the rows of the config dataframe)
         #config_f = self.setup.tmp_input_dir/('dtiQA_config.csv')
         config_f = session_input/('dtiQA_config.csv')
@@ -1349,6 +1354,20 @@ class PreQualGenerator(ScriptGenerator):
 
         #write the PreQual command
         script.write("echo Done writing config file. Now running PreQual...\n")
+        if self.setup.args.skull_stripped:
+            script.write("echo Skull stripping T1 for synb0...\n")
+            #make sure to strip the t1 for synb0
+            seg_file = session_input/('seg.nii.gz')
+            mask_file = session_input/('mask.nii.gz')
+            t1 = session_input/('t1.nii.gz')
+            t1_temp = session_input/('t1_temp.nii.gz')
+            script.write('singularity exec -e --contain -B {}:{} -B /tmp:/tmp {} fslmaths {} -bin {}\n'.format(str(session_input), str(session_input),
+                str(self.setup.simg), str(seg_file), str(mask_file)))
+            script.write('singularity exec -e --contain -B {}:{} -B /tmp:/tmp {} fslmaths {} -mul {} {}\n'.format(str(session_input), str(session_input),
+                str(self.setup.simg), str(t1), str(mask_file), str(t1_temp)))
+            script.write('rm {}\n'.format(str(t1)))
+            script.write('mv {} {}\n'.format(str(t1_temp), str(t1)))
+            script.write('Done skull stripping T1 for synb0. NOW running PreQual...\n')
         script.write('singularity run -e --contain -B {}:/INPUTS -B {}:/OUTPUTS -B {}:/APPS/freesurfer/license.txt -B /tmp:/tmp {} {} {}\n'.format(str(session_input),
             str(session_output), str(self.setup.freesurfer_license_path), str(self.setup.simg), PEaxis, opts))
         script.write("echo Finished running PreQual. Now removing inputs and copying outputs back...\n")
@@ -1469,6 +1488,19 @@ class PreQualGenerator(ScriptGenerator):
                     if not t1:
                         self.add_to_missing(sub, ses, acq, run, 'T1_missing')
                         continue
+                    #if you want to run with the T1 stripped
+                    if self.setup.args.skull_stripped:
+                        #also must find the corresponding SLANT segmentaion
+                        #based on the T1, get the TICV/UNest segmentation
+                        ses_deriv = pqdir.parent
+                        if not self.setup.args.use_unest_seg:
+                            seg = self.get_TICV_seg_file(t1, ses_deriv)
+                        else:
+                            seg = self.get_UNest_seg_file(t1, ses_deriv)
+                        if not seg.exists():
+                            self.add_to_missing(sub, ses, acq, run, 'TICV' if not self.setup.args.use_unest_seg else 'UNest')
+                            continue
+
                     self.count += 1 #we should have everything, so we can generate the script
                     self.warnings[self.count] = ''
                     #warning if PEunknown
@@ -1478,7 +1510,13 @@ class PreQualGenerator(ScriptGenerator):
                     (session_input, session_output) = self.make_session_dirs(sub, ses, acq, run, tmp_input_dir=self.setup.tmp_input_dir,
                                             tmp_output_dir=self.setup.tmp_output_dir)
                     #setup the inputs dicitonary
-                    self.inputs_dict[self.count] = {'dwi': need_dwis[dir_num], 'bval': need_bvals[dir_num],
+                    if self.setup.args.skull_stripped:
+                        self.inputs_dict[self.count] = {'dwi': need_dwis[dir_num], 'bval': need_bvals[dir_num],
+                                                    'bvec': need_bvecs[dir_num], 't1': {'src_path':t1, 'targ_name': 't1.nii.gz'},
+                                                    'seg': {'src_path':seg, 'targ_name': 'seg.nii.gz'}}
+                        self.warnings[self.count] += "Running synb0 with skull-stripped T1\n"
+                    else:
+                        self.inputs_dict[self.count] = {'dwi': need_dwis[dir_num], 'bval': need_bvals[dir_num],
                                                     'bvec': need_bvecs[dir_num], 't1': {'src_path':t1, 'targ_name': 't1.nii.gz'}}
                     #if run != '':
                     #    print(self.inputs_dict[self.count])
@@ -1513,6 +1551,19 @@ class PreQualGenerator(ScriptGenerator):
                         if not t1:
                             self.add_to_missing(sub, ses, acq, run, 'T1_missing')
                             continue
+                        #check to see if you need it to be skull-stripped
+                        #if you want to run with the T1 stripped
+                        if self.setup.args.skull_stripped:
+                            #also must find the corresponding SLANT segmentaion
+                            #based on the T1, get the TICV/UNest segmentation
+                            ses_deriv = pqdir.parent
+                            if not self.setup.args.use_unest_seg:
+                                seg = self.get_TICV_seg_file(t1, ses_deriv)
+                            else:
+                                seg = self.get_UNest_seg_file(t1, ses_deriv)
+                            if not seg.exists():
+                                self.add_to_missing(sub, ses, acq, run, 'TICV' if not self.setup.args.use_unest_seg else 'UNest')
+                                continue
                     #otherwise, continue as normal
                     self.count += 1 #we should have everything, so we can generate the script
                     self.warnings[self.count] = ''
@@ -1532,7 +1583,13 @@ class PreQualGenerator(ScriptGenerator):
                     #setup the inputs dictionary
                     self.inputs_dict[self.count] = {'dwi': dwis, 'bval': bvals, 'bvec': bvecs}
                     if needs_synb0:
-                        self.inputs_dict[self.count]['t1'] = {'src_path':t1, 'targ_name': 't1.nii.gz'}
+                        if self.setup.args.skull_stripped:
+                            self.inputs_dict[self.count]['t1'] = {'src_path':t1, 'targ_name': 't1.nii.gz'}
+                            self.inputs_dict[self.count]['seg'] = {'src_path':seg, 'targ_name': 'seg.nii.gz'}
+                            self.warnings[self.count] += "Running synb0 with skull-stripped T1\n"
+                        else:
+                            self.inputs_dict[self.count]['t1'] = {'src_path':t1, 'targ_name': 't1.nii.gz'}
+                            self.warnings[self.count] += "Running synb0 with raw T1\n"
                         self.warnings[self.count] += "Using T1 for synb0, as no ReversePE scans were found.\n"
                     self.outputs[self.count] = []
 
@@ -2829,7 +2886,7 @@ class FreewaterGenerator(ScriptGenerator):
         """
         
         script.write("echo Running FreeWater...\n")
-        script.write("echo singularity run -B {}:/input -B {}:/output {} dwmri.nii.gz dwmri.bval dwmri.bvec mask.nii.gz\n".format(session_input, session_output, self.setup.simg))
+        script.write("echo singularity run -e --contain -B {}:/input -B {}:/output --home {} -B /tmp:/tmp -B {}:/dev/shm {} dwmri.nii.gz dwmri.bval dwmri.bvec mask.nii.gz\n".format(session_input, session_output, session_input, session_input, self.setup.simg))
         #singularity run -B inputs/:/input -B outputs/:/output ../FreeWaterEliminationv2.sif dwmri.nii.gz dwmri.bval dwmri.bvec mask.nii.gz
 
     def generate_freewater_scripts(self):
@@ -3641,7 +3698,7 @@ def get_sub_ses_dwidir(dwi_dir):
         ses = up_one.name
         sub = up_one.parent.name
     else:
-        ses = None
+        ses = ''
         sub = up_one.name
     return sub, ses
             
