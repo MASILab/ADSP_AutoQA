@@ -69,6 +69,7 @@ def pa():
     p.add_argument('--TR_tolerance_PQ', default=0.01, type=float, help="Tolerance for TR differences in determining scan similarity for PreQual")
     p.add_argument('--accre_gpu', action='store_true', help="If you want to run the pipeline on ACCRE with a GPU (note, you may need to specify simgs with a CUDA installation)")
     p.add_argument('--tractseg_make_DTI', action='store_true', help="If you want to make the DTI files for Tractseg")
+    p.add_argument('--tractseg_DTI_use_all_shells', action='store_true', help="If you want to forego the shelling for calculating DTI measures")
     return p.parse_args()
 
 class ScriptGeneratorSetup:
@@ -1140,7 +1141,8 @@ class ScriptGenerator:
                         #input['src_path'] = input['src_path'] / '*' #for copying contents of the directory (e.g. PreQual/PREPROCESSED)
                         #targ_file = targ_file / '*' 
                         write_copy_to_input_line(self, script, input['src_path']/'*', targ_file)
-                        write_ssh_provenance_check_directory(self, script, input['src_path'], targ_file)
+                        #write_ssh_provenance_check_directory(self, script, input['src_path'], targ_file)
+                        write_ssh_provenance_check_directory(self, script, targ_file, input['src_path'])
                     else:
                         write_copy_to_input_line(self, script, input['src_path'], targ_file)
                         write_ssh_provenance_check(self, script, input['src_path'], targ_file)
@@ -2478,7 +2480,13 @@ class TractsegGenerator(ScriptGenerator):
             shellbval = "{}/dwmri%firstshell.bval".format(kwargs['temp_dir'])
             shellnii = "{}/dwmri%firstshell.nii.gz".format(kwargs['temp_dir'])
             tensor = "{}/dwmri_tensor.nii.gz".format(kwargs['temp_dir'])
-            script.write("time singularity exec -e --contain -B /tmp:/tmp -B {}:{} {} dwi2tensor -fslgrad {} {} {} {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, shellbvec, shellbval, shellnii, tensor))
+            if self.setup.args.tractseg_DTI_use_all_shells:
+                orig_dwi = "{}/dwmri.nii.gz".format(kwargs['temp_dir'])
+                orig_bval = "{}/dwmri.bval".format(kwargs['temp_dir'])
+                orig_bvec = "{}/dwmri.bvec".format(kwargs['temp_dir'])
+                script.write("time singularity exec -e --contain -B /tmp:/tmp -B {}:{} {} dwi2tensor -fslgrad {} {} {} {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, orig_bvec, orig_bval, orig_dwi, tensor))
+            else:
+                script.write("time singularity exec -e --contain -B /tmp:/tmp -B {}:{} {} dwi2tensor -fslgrad {} {} {} {}\n".format(kwargs['temp_dir'], kwargs['temp_dir'], mrtrix_simg, shellbvec, shellbval, shellnii, tensor))
             script.write("echo Comuting DTI scalar maps...\n")
             fa = "{}/dwmri_tensor_fa.nii.gz".format(kwargs['temp_dir'])
             md = "{}/dwmri_tensor_md.nii.gz".format(kwargs['temp_dir'])
@@ -2531,8 +2539,8 @@ class TractsegGenerator(ScriptGenerator):
         script.write("echo Done computing measures per bundle. Now deleting temp inputs and re-organizing outputs...\n")
         script.write("rm -r {}/tractseg/TOM\n".format(kwargs['temp_dir']))
         script.write("rm -r {}/tractseg/peaks.nii.gz\n".format(kwargs['temp_dir']))
-        script.write("rm -r {}/dwmri.nii.gz\n".format(kwargs['temp_dir']))
-        script.write("rm -r {}/dwmri_1mm_iso.nii.gz\n".format(kwargs['temp_dir']))
+        script.write("rm {}/dwmri.nii.gz\n".format(kwargs['temp_dir']))
+        script.write("rm {}/dwmri_1mm_iso.nii.gz\n".format(kwargs['temp_dir']))
         script.write("rm {}/dwmri_tensor_fa.nii.gz\n".format(kwargs['temp_dir']))
         script.write("rm {}/dwmri_tensor_md.nii.gz\n".format(kwargs['temp_dir']))
         script.write("rm {}/dwmri_tensor_ad.nii.gz\n".format(kwargs['temp_dir']))
@@ -2985,6 +2993,7 @@ class DWI_plus_TractsegGenerator(ScriptGenerator):
         script.write("time singularity exec -e --contain -B /tmp:tmp -B {}:{} {} bash -c \"dwiextract {}/dwmri.nii.gz -fslgrad {}/dwmri.bvec {}/dwmri.bval - -bzero | mrmath - mean {} -axis 3\"\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], b0))
         script.write("echo Creating mask...\n")
         mask = "{}/dwmri_mask.nii.gz".format(dti_dir)
+        #script.write("cp {}/mask.nii.gz {}\n".format(kwargs['temp_dir'], mask))
         script.write("time singularity exec -e --contain -B /tmp:tmp -B {}:{} {} bet {} {} -f 0.25 -m -n -R\n".format(kwargs['temp_dir'], kwargs['temp_dir'], dwi_simg, b0, mask))
         script.write("echo Fitting tensors...\n")
         shellbvec = "{}/dwmri%firstshell.bvec".format(dti_dir)
