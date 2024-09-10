@@ -2452,6 +2452,8 @@ class TractsegGenerator(ScriptGenerator):
         Writes the command for running Tractseg to a script
         """
 
+        #bind for the directory we are running tractseg from (not the home directory)?
+
         #define the singularities
         if self.setup.args.tractseg_make_DTI:
             ts_simg = self.setup.simg[0]
@@ -3028,11 +3030,10 @@ class DWI_plus_TractsegGenerator(ScriptGenerator):
 
         script.write("echo Done resampling to 1mm iso. Now running TractSeg...\n")
         script.write('echo "..............................................................................."\n')
-        if not self.setup.args.no_accre:
-            script.write("echo Loading FSL...\n")
-
-            script.write("export FSL_DIR=/accre/arch/easybuild/software/MPI/GCC/6.4.0-2.28/OpenMPI/2.1.1/FSL/5.0.10/fsl\n")
-            script.write("source setup_accre_runtime_dir\n")
+        #if not self.setup.args.no_accre:
+        #    script.write("echo Loading FSL...\n")
+        #    script.write("export FSL_DIR=/accre/arch/easybuild/software/MPI/GCC/6.4.0-2.28/OpenMPI/2.1.1/FSL/5.0.10/fsl\n")
+        #    script.write("source setup_accre_runtime_dir\n")
 
         tractsegdir = "{}/tractseg".format(kwargs['temp_dir'])
         script.write("time singularity run -e --contain -B /tmp:tmp -B {}:{} -B {}:{} {} TractSeg -i {} --raw_diffusion_input -o {} --bvals {}/dwmri.bval --bvecs {}/dwmri.bvec\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, isodwi, tractsegdir, kwargs['temp_dir'], kwargs['temp_dir']))
