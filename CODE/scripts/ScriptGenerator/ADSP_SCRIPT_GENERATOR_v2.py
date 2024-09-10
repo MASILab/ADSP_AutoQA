@@ -227,15 +227,15 @@ class ScriptGeneratorSetup:
                         'EVE3WMAtlas': '/nobackup/p_masi/Singularities/WMAtlas_v1.3.simg',
                         'MNI152WMAtlas': '/nobackup/p_masi/Singularities/WMAtlas_v1.3.simg',
                         'UNest': '/nobackup/p_masi/Singularities/UNest.sif',
-                        'tractseg': ["/nobackup/p_masi/Singularities/tractseg.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif"] if not self.args.tractseg_make_DTI else ["/nobackup/p_masi/Singularities/tractseg.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif", "/nobackup/p_masi/Singularities/WMAtlas_v1.2.simg"],
+                        'tractseg': ["/nobackup/p_masi/Singularities/tractsegv2.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif"] if not self.args.tractseg_make_DTI else ["/nobackup/p_masi/Singularities/tractsegv2.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif", "/nobackup/p_masi/Singularities/WMAtlas_v1.2.simg"],
                         'MaCRUISE': "/nobackup/p_masi/Singularities/macruise_classern_v3.2.0.simg",
                         'FrancoisSpecial': '/nobackup/p_masi/Singularities/singularity_francois_special_v1.sif',
                         'ConnectomeSpecial': '/nobackup/p_masi/Singularities/ConnectomeSpecial_v1.3.sif',
                         'Biscuit': '/nobackup/p_masi/Singularities/biscuit_FC_v2.2.sif',
                         'NODDI': '/nobackup/p_masi/Singularities/tractoflow_2.2.1_b9a527_2021-04-13.sif',
                         'freewater': '/nobackup/p_masi/Singularities/FreeWaterEliminationv2.sif',
-                        'DWI_plus_Tractseg': ["/nobackup/p_masi/Singularities/tractseg.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif", "/nobackup/p_masi/Singularities/WMAtlas_v1.3.simg"],
-                        'BedpostX_plus_Tractseg': ["/nobackup/p_masi/Singularities/tractseg.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif", "/nobackup/p_masi/Singularities/WMAtlas_v1.3.simg"]
+                        'DWI_plus_Tractseg': ["/nobackup/p_masi/Singularities/tractsegv2.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif", "/nobackup/p_masi/Singularities/WMAtlas_v1.3.simg"],
+                        'BedpostX_plus_Tractseg': ["/nobackup/p_masi/Singularities/tractsegv2.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif", "/nobackup/p_masi/Singularities/WMAtlas_v1.3.simg"]
                     }
             simg = mapping[self.args.pipeline]
         except:
@@ -862,6 +862,22 @@ class ScriptGenerator:
             return t1_prov
         return None
     
+    def legacy_get_dwis(self, sub, ses, acq, run):
+        """
+        Given the BIDS fields, return the original dwi, bval, bvec files
+        """
+        dwidir = self.setup.root_dataset_path / sub / ses / "dwi"
+        sesx = '_'+ses if ses != '' else ''
+        acqx = '_'+acq if acq != '' else ''
+        runx = '_'+run if run != '' else ''
+        dwi = dwidir / ("{}{}{}{}_dwi.nii.gz".format(sub, sesx, acqx, runx))
+        bval = dwidir / ("{}{}{}{}_dwi.bval".format(sub, sesx, acqx, runx))
+        bvec = dwidir / ("{}{}{}{}_dwi.bvec".format(sub, sesx, acqx, runx))
+
+        if all([x.exists() for x in [dwi, bval, bvec]]):
+            return (dwi, bval, bvec)
+        return  None
+
     def get_prov_dwi(self, dir):
         """
         Given a processing directory, get the DWI, bval, bvec that was used as input
@@ -2508,14 +2524,14 @@ class TractsegGenerator(ScriptGenerator):
         script.write("time singularity run -e --contain -B /tmp:/tmp -B {}:{} {} mrgrid {}/dwmri_tensor_ad.nii.gz regrid {}/dwmri_tensor_ad_1mm_iso.nii.gz -voxel 1\n".format(kwargs['temp_dir'],kwargs['temp_dir'], mrtrix_simg, kwargs['temp_dir'], kwargs['temp_dir']))
         script.write("time singularity run -e --contain -B /tmp:/tmp -B {}:{} {} mrgrid {}/dwmri_tensor_rd.nii.gz regrid {}/dwmri_tensor_rd_1mm_iso.nii.gz -voxel 1\n".format(kwargs['temp_dir'],kwargs['temp_dir'], mrtrix_simg, kwargs['temp_dir'], kwargs['temp_dir']))
 
-        script.write("echo Done resampling to 1mm iso. Now running TractSeg...\n")
-        script.write('echo "..............................................................................."\n')
-        script.write("echo Loading FSL...\n")
+        #script.write("echo Done resampling to 1mm iso. Now running TractSeg...\n")
+        #script.write('echo "..............................................................................."\n')
+        #script.write("echo Loading FSL...\n")
 
-        script.write("export FSL_DIR=/accre/arch/easybuild/software/MPI/GCC/6.4.0-2.28/OpenMPI/2.1.1/FSL/5.0.10/fsl\n")
-        script.write("source setup_accre_runtime_dir\n")
+        #script.write("export FSL_DIR=/accre/arch/easybuild/software/MPI/GCC/6.4.0-2.28/OpenMPI/2.1.1/FSL/5.0.10/fsl\n")
+        #script.write("source setup_accre_runtime_dir\n")
 
-        script.write("time singularity run -e --contain -B /tmp:/tmp -B {}:{} -B {}:{} {} TractSeg -i {}/dwmri_1mm_iso.nii.gz --raw_diffusion_input -o {}/tractseg --bvals {}/dwmri.bval --bvecs {}/dwmri.bvec\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir']))
+        script.write("time singularity run -e --contain --home {} -B /tmp:/tmp -B {}:{} -B {}:{} {} TractSeg -i {}/dwmri_1mm_iso.nii.gz --raw_diffusion_input -o {}/tractseg --bvals {}/dwmri.bval --bvecs {}/dwmri.bvec\n".format(kwargs['temp_dir'], kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir']))
         script.write('if [[ -f "{}/tractseg/peaks.nii.gz" ]]; then echo "Successfully created peaks.nii.gz for {}"; error_flag=0; else echo "Improper bvalue/bvector distribution for {}"; error_flag=1; fi\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir']))
         script.write('if [[ $error_flag -eq 1 ]]; then echo "Improper bvalue/bvector distribution for {}" >> {}/report_bad_bvector.txt; fi\n\n'.format(kwargs['temp_dir'], kwargs['temp_dir']))        
 
@@ -2524,9 +2540,9 @@ class TractsegGenerator(ScriptGenerator):
         script.write("exit 1\n")
         script.write("fi\n\n")
 
-        script.write("time singularity run -e --contain -B /tmp:/tmp -B {}:{} -B {}:{} {} TractSeg -i {}/tractseg/peaks.nii.gz -o {}/tractseg --output_type endings_segmentation\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, kwargs['temp_dir'], kwargs['temp_dir']))
-        script.write("time singularity run -e --contain -B /tmp:/tmp -B {}:{} -B {}:{} {} TractSeg -i {}/tractseg/peaks.nii.gz -o {}/tractseg --output_type TOM\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, kwargs['temp_dir'], kwargs['temp_dir']))
-        script.write("time singularity run -e --contain -B /tmp:/tmp -B {}:{} -B {}:{} {} Tracking -i {}/tractseg/peaks.nii.gz -o {}/tractseg --tracking_format tck\n".format(kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, kwargs['temp_dir'], kwargs['temp_dir']))
+        script.write("time singularity run -e --contain --home {} -B /tmp:/tmp -B {}:{} -B {}:{} {} TractSeg -i {}/tractseg/peaks.nii.gz -o {}/tractseg --output_type endings_segmentation\n".format(kwargs['temp_dir'], kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, kwargs['temp_dir'], kwargs['temp_dir']))
+        script.write("time singularity run -e --contain --home {} -B /tmp:/tmp -B {}:{} -B {}:{} {} TractSeg -i {}/tractseg/peaks.nii.gz -o {}/tractseg --output_type TOM\n".format(kwargs['temp_dir'], kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, kwargs['temp_dir'], kwargs['temp_dir']))
+        script.write("time singularity run -e --contain --home {} -B /tmp:/tmp -B {}:{} -B {}:{} {} Tracking -i {}/tractseg/peaks.nii.gz -o {}/tractseg --tracking_format tck\n".format(kwargs['temp_dir'], kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, kwargs['temp_dir'], kwargs['temp_dir']))
 
         script.write('echo "..............................................................................."\n')
         script.write("echo Done running TractSeg. Now computing measures per bundle...\n")
@@ -2539,9 +2555,15 @@ class TractsegGenerator(ScriptGenerator):
         script.write('done\n\n')
 
         script.write("echo Done computing measures per bundle. Now deleting temp inputs and re-organizing outputs...\n")
+        if self.setup.args.tractseg_make_DTI:
+            script.write("rm {}\n".format(tensor))
+            script.write("rm {}\n".format(shellnii))
+            script.write("rm {}\n".format(shellbval))
+            script.write("rm {}\n".format(shellbvec))
         script.write("rm -r {}/tractseg/TOM\n".format(kwargs['temp_dir']))
         script.write("rm -r {}/tractseg/peaks.nii.gz\n".format(kwargs['temp_dir']))
         script.write("rm {}/dwmri.nii.gz\n".format(kwargs['temp_dir']))
+        script.write("rm {}/mask.nii.gz\n".format(kwargs['temp_dir']))
         script.write("rm {}/dwmri_1mm_iso.nii.gz\n".format(kwargs['temp_dir']))
         script.write("rm {}/dwmri_tensor_fa.nii.gz\n".format(kwargs['temp_dir']))
         script.write("rm {}/dwmri_tensor_md.nii.gz\n".format(kwargs['temp_dir']))
@@ -2716,7 +2738,12 @@ class FrancoisSpecialGenerator(ScriptGenerator):
             og_dwis = self.get_prov_dwi(pqdir)
             if not og_dwis:
                 #no provenance DWIs found
-                assert False, "Error: No provenance DWIs found for {}/{}/{}".format(sub, ses, pqdir)
+                #legacy: backtrack to have it check the subject and session
+                og_dwis = self.legacy_get_dwis(sub, ses, acq, run)
+                if not og_dwis:
+                    self.add_to_missing(sub, ses, acq, run, 'raw_legacy_DWIs')
+                    continue
+                #assert False, "Error: No provenance DWIs found for {}/{}/{}".format(sub, ses, pqdir)
             (dwis, bvals, bvecs) = og_dwis
             if type(dwis) is not list:
                 dwis = [dwis]
