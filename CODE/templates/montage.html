@@ -44,6 +44,9 @@
         .qa-button.active {
             background-color: lightgreen; /* Green for Yes */
         }
+        .qa-button.active.yes {
+            background-color: lightgreen; /* Green for Yes */
+        }
         .qa-button.active.no {
             background-color: tomato; /* Red for No */
         }
@@ -304,10 +307,36 @@
             return button;
         }
 
+        //WIP: function to get a specific QA button
+            //for instance, pass it the text 'Yes' and it will return the button with the text 'Yes'
+        function findButtonByTextContent(text) {
+            const buttons = document.querySelectorAll('.qa-button');
+            for (let button of buttons) {
+                if (button.textContent === text) {
+                    return button;
+                }
+            }
+            return null;  // If no button with the specified text is found
+        }
+
+        //WIP: set the current button status to active
+        function setButtonActive(button) {
+            document.querySelectorAll('.qa-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            // Highlight button (i.e. set the active status for this button)
+            button.classList.add('active');
+        }
+
         // Function to handle keyboard events
         function handleKeyboardEvent(event) {
 
             if (isInputFocused) {
+                //if (event.code === 'Enter') {
+                //    // Make the input unfocused on Enter key press
+                //    isInputFocused = false;
+                //    console.log('Input unfocused');
+                //}
                 return; // Do nothing if an input field is focused
             }
 
@@ -320,6 +349,25 @@
                     break;
                 case 'Space':
                     toggleLoop(); // Toggle looping on spacebar press
+                    break;
+                // TODO: Keyboard shortcuts for QA buttons
+                case 'KeyQ':
+                    button = findButtonByTextContent('Yes');
+                    if (button) {
+                        button.click();
+                    }
+                    break;
+                case 'KeyW':
+                    button = findButtonByTextContent('No');
+                    if (button) {
+                        button.click();
+                    }
+                    break;
+                case 'KeyE':
+                    button = findButtonByTextContent('Maybe');
+                    if (button) {
+                        button.click();
+                    }
                     break;
                 default:
                     break;
