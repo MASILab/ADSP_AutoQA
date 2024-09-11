@@ -65,6 +65,11 @@
             width: 100%;
             box-sizing: border-box;
         }
+        .reason-input.focused {
+            border: 2px solid red;
+            /* Add other styles to indicate focus maybe? */
+        }
+
         .loading-bar-container {
             width: 100%;
             height: 20px;
@@ -100,6 +105,7 @@
         let currentImageIndex = 0; // Track current image index
         let isLooping = false; // Flag to track if looping is active
         let updateInterval = null; // Interval reference for automatic update
+        let reasonInput; // Declare globally to access in multiple functions
         let isInputFocused = false; // Flag to track if an input field is focused
         // save the json dict to a variable
         const nestedDict = JSON.parse('{{ json_dict | tojson | safe }}');
@@ -245,8 +251,20 @@
             reasonInput.className = 'reason-input';
             reasonInput.placeholder = 'Enter reason for QA status...';
             reasonInput.value = qaDict['reason'];
-            reasonInput.addEventListener('focus', () => { isInputFocused = true; });
-            reasonInput.addEventListener('blur', () => { isInputFocused = false; });
+            //reasonInput.addEventListener('focus', () => { isInputFocused = true; });
+            //reasonInput.addEventListener('blur', () => { isInputFocused = false; });
+
+            //WIP
+            reasonInput.addEventListener('focus', () => { 
+                isInputFocused = true; 
+                reasonInput.classList.add('focused'); // Optional: add a class to highlight the input
+                //console.log('Input focused');
+            });
+            reasonInput.addEventListener('blur', () => { 
+                isInputFocused = false; 
+                reasonInput.classList.remove('focused'); // Remove highlight
+                //console.log('Input unfocused');
+            });
             imageContainer.appendChild(reasonInput);
 
 
@@ -331,46 +349,61 @@
         // Function to handle keyboard events
         function handleKeyboardEvent(event) {
 
-            if (isInputFocused) {
-                //if (event.code === 'Enter') {
-                //    // Make the input unfocused on Enter key press
-                //    isInputFocused = false;
-                //    console.log('Input unfocused');
-                //}
-                return; // Do nothing if an input field is focused
+            if (event.code === 'Enter') {
+                const reasonInput = document.querySelector('.reason-input');
+                if (!reasonInput) {
+                    console.error('reasonInput is not initialized yet.');
+                    return; // Exit if reasonInput is undefined
+                }
+                if (isInputFocused) {
+                    // Unfocus the input field
+                    reasonInput.blur(); // This will trigger the 'blur' event and set isInputFocused to false
+                    //console.log('event Input unfocused');
+                } else {
+                    // Focus the input field
+                    reasonInput.focus(); // This will trigger the 'focus' event and set isInputFocused to true
+                    //console.log('event Input focused');
+                }
+                // Prevent further handling of the Enter key
+                event.preventDefault();
             }
+            else {
+                if (isInputFocused) {
+                    return; // Do nothing if an input field is focused
+                }
 
-            switch (event.code) {
-                case 'ArrowLeft':
-                    navigateImage(-1); // Move to previous image
-                    break;
-                case 'ArrowRight':
-                    navigateImage(1); // Move to next image
-                    break;
-                case 'Space':
-                    toggleLoop(); // Toggle looping on spacebar press
-                    break;
-                // TODO: Keyboard shortcuts for QA buttons
-                case 'KeyQ':
-                    button = findButtonByTextContent('Yes');
-                    if (button) {
-                        button.click();
-                    }
-                    break;
-                case 'KeyW':
-                    button = findButtonByTextContent('No');
-                    if (button) {
-                        button.click();
-                    }
-                    break;
-                case 'KeyE':
-                    button = findButtonByTextContent('Maybe');
-                    if (button) {
-                        button.click();
-                    }
-                    break;
-                default:
-                    break;
+                switch (event.code) {
+                    case 'ArrowLeft':
+                        navigateImage(-1); // Move to previous image
+                        break;
+                    case 'ArrowRight':
+                        navigateImage(1); // Move to next image
+                        break;
+                    case 'Space':
+                        toggleLoop(); // Toggle looping on spacebar press
+                        break;
+                    // TODO: Keyboard shortcuts for QA buttons
+                    case 'KeyQ':
+                        button = findButtonByTextContent('Yes');
+                        if (button) {
+                            button.click();
+                        }
+                        break;
+                    case 'KeyW':
+                        button = findButtonByTextContent('No');
+                        if (button) {
+                            button.click();
+                        }
+                        break;
+                    case 'KeyE':
+                        button = findButtonByTextContent('Maybe');
+                        if (button) {
+                            button.click();
+                        }
+                        break;
+                    default:
+                        break;
+                }
             }
         }
 
