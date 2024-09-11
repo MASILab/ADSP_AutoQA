@@ -123,7 +123,7 @@ where the QA file should be displayed along with three buttons and a text box be
 
 Alternatively (and my preferred method), you can press the `spacebar` to start a montage, where the app will pass through QA files automatically. You can press the `spacebar` again to stop the montage at any point in time, which will pause the montage on the current image.
 
-7.) Once you see a file with a poor or questionable quality, you can indicate so by clicking the corresponding `yes,no,maybe` buttons. The clicked button will light up, showing the current QA status of the file. Additionally, you may enter any relevant text the provides an explanation for your QA decision.
+7.) Once you see a file with a poor or questionable quality, you can indicate so by clicking the corresponding `yes,no,maybe` buttons (either with the mouse or with the keybinds defined above in `CONTROLS` section). The clicked button will light up, showing the current QA status of the file. Additionally, you may enter any relevant text the provides an explanation for your QA decision, and jump in and out of the text box using the `Enter` key.
 
 8.) After altering the QA status and/or reason, the app will compare the new status to the status currently held by the file. If there is an update, the change will be pushed to both corresponding `QA.json` and `QA.csv` files upon moving to a different image in the app, along with updated `user` and `date` entries.
 
