@@ -1089,10 +1089,10 @@ class ScriptGenerator:
 
             #this will get the mdm5sum of all the files in the source directory
             if not self.setup.args.no_scp: #another /* here?
-                content="src_dir={output_dir}; declare -A targ_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\"; key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); targ_dict[\"$key\"]=\"$value\"; done < <(ssh {ID}@{server} \"find ${{src_dir}} \( -type f -o -type l \) -exec md5sum {{}} +\")\n".format(ID=self.setup.vunetID, server=self.setup.args.src_server, output_dir=str(targ_dir)+'/')
+                content="src_dir={output_dir}; declare -A remote_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\"; key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); remote_dict[\"$key\"]=\"$value\"; done < <(ssh {ID}@{server} \"find ${{src_dir}} \( -type f -o -type l \) -exec md5sum {{}} +\")\n".format(ID=self.setup.vunetID, server=self.setup.args.src_server, output_dir=str(targ_dir)+'/')
                 script.write(content)
             else:
-                content="src_dir={output_dir}; declare -A targ_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\"; key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); targ_dict[\"$key\"]=\"$value\"; done < <(find $src_dir \( -type f -o -type l \) -exec md5sum {{}} +)\n".format(output_dir=str(targ_dir)+'/')
+                content="src_dir={output_dir}; declare -A remote_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\"; key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); remote_dict[\"$key\"]=\"$value\"; done < <(find $src_dir \( -type f -o -type l \) -exec md5sum {{}} +)\n".format(output_dir=str(targ_dir)+'/')
                 script.write(content)
             #this will get the mdm5sum of all the files in the target directory (i.e. the one on the computation node input)
             content="src_dir={output_dir}; declare -A local_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\"; key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); local_dict[\"$key\"]=\"$value\"; done < <(find $src_dir \( -type f -o -type l \) -exec md5sum {{}} +)\n".format(output_dir=str(input)+'/')
@@ -1112,9 +1112,18 @@ class ScriptGenerator:
             #     script.write(content)
                 #script.write('declare -A targ_dict && while read -r value key; do targ_dict[${{key}}]=$value; done <<< "$(md5sum {}/*)"'.format(targ_dir))
             #this will loop through all the keys in the source directory, and check if the md5sums match between the corresponding files
-            script.write('for key in "${!local_dict[@]}"; do\n')
-            script.write('    if [ "${local_dict[$key]}" != "${targ_dict[$key]}" ]; then\n')
-            script.write('        echo "PROVENANCE FAIL: Files $key do not match"; echo local: ${local_dict[$key]}; echo target: ${targ_dict[$key]}; exit 1\n')
+
+            # #old: looping through the local
+            # script.write('for key in "${!local_dict[@]}"; do\n')
+            # script.write('    if [ "${local_dict[$key]}" != "${remote_dict[$key]}" ]; then\n')
+            # script.write('        echo "PROVENANCE FAIL: Files $key do not match"; echo local: ${local_dict[$key]}; echo remote: ${remote_dict[$key]}; exit 1\n')
+            # script.write('    fi\n')
+            # script.write('done\n')
+
+            #new: looping through the remote
+            script.write('for key in "${!remote_dict[@]}"; do\n')
+            script.write('    if [ "${local_dict[$key]}" != "${remote_dict[$key]}" ]; then\n')
+            script.write('        echo "PROVENANCE FAIL: Files $key do not match"; echo local: ${local_dict[$key]}; echo remote: ${remote_dict[$key]}; exit 1\n')
             script.write('    fi\n')
             script.write('done\n')
 
@@ -2524,7 +2533,7 @@ class TractsegGenerator(ScriptGenerator):
         script.write("time singularity run -e --contain -B /tmp:/tmp -B {}:{} {} mrgrid {}/dwmri_tensor_ad.nii.gz regrid {}/dwmri_tensor_ad_1mm_iso.nii.gz -voxel 1\n".format(kwargs['temp_dir'],kwargs['temp_dir'], mrtrix_simg, kwargs['temp_dir'], kwargs['temp_dir']))
         script.write("time singularity run -e --contain -B /tmp:/tmp -B {}:{} {} mrgrid {}/dwmri_tensor_rd.nii.gz regrid {}/dwmri_tensor_rd_1mm_iso.nii.gz -voxel 1\n".format(kwargs['temp_dir'],kwargs['temp_dir'], mrtrix_simg, kwargs['temp_dir'], kwargs['temp_dir']))
 
-        #script.write("echo Done resampling to 1mm iso. Now running TractSeg...\n")
+        script.write("echo Done resampling to 1mm iso. Now running TractSeg...\n")
         #script.write('echo "..............................................................................."\n')
         #script.write("echo Loading FSL...\n")
 
@@ -2560,6 +2569,8 @@ class TractsegGenerator(ScriptGenerator):
             script.write("rm {}\n".format(shellnii))
             script.write("rm {}\n".format(shellbval))
             script.write("rm {}\n".format(shellbvec))
+        script.write("rm -r {}/dwi2response-tmp-*\n".format(kwargs['temp_dir']))
+        script.write("rm -r {}/.cache\n".format(kwargs['temp_dir']))
         script.write("rm -r {}/tractseg/TOM\n".format(kwargs['temp_dir']))
         script.write("rm -r {}/tractseg/peaks.nii.gz\n".format(kwargs['temp_dir']))
         script.write("rm {}/dwmri.nii.gz\n".format(kwargs['temp_dir']))
