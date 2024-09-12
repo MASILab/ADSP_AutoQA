@@ -1368,6 +1368,9 @@ class PreQualGenerator(ScriptGenerator):
 
         #write the dtiQA_config.csv file (iterate over the rows of the config dataframe)
         #config_f = self.setup.tmp_input_dir/('dtiQA_config.csv')
+
+        ### REMOVE ANY INPUTS LEFTOVER FROM PREVIOUS RUNS
+        script.write("rm -r {}/*\n".format(str(session_input)))
         config_f = session_input/('dtiQA_config.csv')
         #with open(config_f, 'w') as config:
         script.write("echo Writing dtiQA_config.csv\n")
