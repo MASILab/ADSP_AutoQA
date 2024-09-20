@@ -1738,7 +1738,8 @@ class SLANT_TICVGenerator(ScriptGenerator):
         script.write("rm -r {}/*\n".format(kwargs['pre']))
         script.write("rm -r {}/*\n".format(kwargs['dl']))
         #removing matlab cache files
-        script.write("rm -rf {}/.mcrCache9.11*\n".format(session_input))
+        script.write("rm -rf {}/.mcrCache9.11\n".format(session_input))
+        script.write("rm -rf {}/.matlab\n".format(session_input))
         script.write("echo Now removing inputs and copying outputs back...\n")
 
     def generate_slant_ticv_scripts(self):
@@ -2591,7 +2592,8 @@ class TractsegGenerator(ScriptGenerator):
         script.write("rm {}/dwmri_tensor_md.nii.gz\n".format(kwargs['temp_dir']))
         script.write("rm {}/dwmri_tensor_ad.nii.gz\n".format(kwargs['temp_dir']))
         script.write("rm {}/dwmri_tensor_rd.nii.gz\n".format(kwargs['temp_dir']))
-        script.write("mv {}/tractseg/TOM_trackings {}/bundles\n".format(kwargs['temp_dir'], kwargs['temp_dir']))
+        script.write("mkdir {}/bundles\n".format(kwargs['temp_dir']))
+        script.write("mv {}/tractseg/TOM_trackings/* {}/bundles\n".format(kwargs['temp_dir'], kwargs['temp_dir']))
         script.write("mv {}/tractseg/measures {}/\n".format(kwargs['temp_dir'], kwargs['temp_dir']))
 
         script.write("echo Done re-organizing outputs. Now copying back to output directory...\n")
