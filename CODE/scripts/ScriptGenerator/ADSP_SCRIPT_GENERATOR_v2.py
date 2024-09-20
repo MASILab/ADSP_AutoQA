@@ -719,8 +719,13 @@ class ScriptGenerator:
         """
 
         files = ["CONNECTOME_Weight_MeanFA_NumStreamlines_10000000_Atlas_SLANT.csv", "CONNECTOME_Weight_NUMSTREAMLINES_NumStreamlines_10000000_Atlas_SLANT.csv",
-                "graphmeasures.json", "graphmeasures_nodes.json", "log.txt", "tracks_10000000_compressed.tck", "ConnectomeQA.png",
-                "CONNECTOME_NUMSTREAM.npy", "CONNECTOME_LENGTH.npy", "CONNECTOME_FA.npy", "b0.nii.gz", "atlas_slant_subj.nii.gz"
+                "CONNECTOME_Weight_MEANLENGTH_NumStreamlines_10000000_Atlas_SLANT.csv",
+                "graphmeasures.json", "graphmeasures_nodes.json", "tracks_10000000_compressed.tck", "ConnectomeQA.png",
+                "CONNECTOME_NUMSTREAM.npy", "CONNECTOME_LENGTH.npy", "CONNECTOME_FA.npy", "atlas_slant_subj.nii.gz",
+                "CONNECTOME_Weight_MeanFA_NumStreamlines_10000000_Atlas_SLANT_w_stem.csv", "CONNECTOME_Weight_NUMSTREAMLINES_NumStreamlines_10000000_Atlas_SLANT_w_stem.csv",
+                "CONNECTOME_Weight_MEANLENGTH_NumStreamlines_10000000_Atlas_SLANT_w_stem.csv",
+                "graphmeasures_w_stem.json", "graphmeasures_nodes_w_stem.json",
+                "CONNECTOME_NUMSTREAM_stem.npy", "CONNECTOME_LENGTH_stem.npy", "CONNECTOME_FA_stem.npy", "atlas_slant_subj_stem.nii.gz"
             ]
         if all([(cs_dir/f).exists() for f in files]):
             return True
@@ -1732,6 +1737,8 @@ class SLANT_TICVGenerator(ScriptGenerator):
         script.write("echo Finished running SLANT-TICV. Now removing pre and dl directories...\n")
         script.write("rm -r {}/*\n".format(kwargs['pre']))
         script.write("rm -r {}/*\n".format(kwargs['dl']))
+        #removing matlab cache files
+        script.write("rm -rf {}/.mcrCache9.11*\n".format(session_input))
         script.write("echo Now removing inputs and copying outputs back...\n")
 
     def generate_slant_ticv_scripts(self):
@@ -2413,8 +2420,9 @@ class ConnectomeSpecialGenerator(ScriptGenerator):
             tensor_maps = [eve3dir/("dwmri%{}.nii.gz".format(m)) for m in ['fa', 'md', 'ad', 'rd']]
             using_PQ = False
             if not all([t.exists() for t in tensor_maps]):
-                row = {'sub':sub, 'ses':ses, 'acq':acq, 'run':run, 'missing':'tensor_maps'}
-                missing_data = pd.concat([missing_data, pd.Series(row).to_frame().T], ignore_index=True)
+                #row = {'sub':sub, 'ses':ses, 'acq':acq, 'run':run, 'missing':'tensor_maps'}
+                #missing_data = pd.concat([missing_data, pd.Series(row).to_frame().T], ignore_index=True)
+                self.add_to_missing(sub, ses, acq, run, 'tensor_maps')
                 continue
             
             #check the other assertions for the ses dirs (for None in ses) --> should only be an issue if not using
