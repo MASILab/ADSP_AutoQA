@@ -1389,7 +1389,7 @@ class PreQualGenerator(ScriptGenerator):
 
         #write the PreQual command
         script.write("echo Done writing config file. Now running PreQual...\n")
-        if self.setup.args.skull_stripped:
+        if self.setup.args.skull_stripped and kwargs['needs_synb0']:
             script.write("echo Skull stripping T1 for synb0...\n")
             #make sure to strip the t1 for synb0
             seg_file = session_input/('seg.nii.gz')
@@ -1567,7 +1567,7 @@ class PreQualGenerator(ScriptGenerator):
                     self.setup_dtiQA_config([need_dwis[dir_num]], PEsign, readout_times)
                     
                     #write the script
-                    self.start_script_generation(session_input, session_output, PEaxis=PEaxis, deriv_output_dir=PQdir_targ)
+                    self.start_script_generation(session_input, session_output, PEaxis=PEaxis, deriv_output_dir=PQdir_targ, needs_synb0=needs_synb0)
 
                     ##TODO##
 
@@ -1632,7 +1632,7 @@ class PreQualGenerator(ScriptGenerator):
                     self.setup_dtiQA_config(dwis, PEsigns, readout_times)
 
                     #write the script
-                    self.start_script_generation(session_input, session_output, PEaxis=PEaxes[0], deriv_output_dir=PQdir_targ) #they should all be the same, so just get the first one
+                    self.start_script_generation(session_input, session_output, PEaxis=PEaxes[0], deriv_output_dir=PQdir_targ, needs_synb0=needs_synb0) #they should all be the same, so just get the first one
                         
                     ##TODO##
             #now all the scripts have been generated
