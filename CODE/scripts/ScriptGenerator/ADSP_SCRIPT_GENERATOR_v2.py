@@ -354,7 +354,7 @@ class ScriptGeneratorSetup:
         with open(self.slurm_options['output'], 'w') as slurm:
             slurm.write("#!/bin/bash\n\n")
             slurm.write("#SBATCH --mail-user={}\n".format(self.slurm_options['email']))
-            slurm.write("#SBATCH --mail-type=FAIL\n")
+            slurm.write("#SBATCH --mail-type=FAIL,END\n")
             slurm.write("#SBATCH --nodes={}\n".format(self.slurm_options['num_nodes']))
             slurm.write("#SBATCH --mem={}\n".format(self.slurm_options['memory_per_job']))
             slurm.write("#SBATCH --time={}\n".format(self.slurm_options['time']))
