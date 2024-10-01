@@ -11,10 +11,35 @@ DTI_PROC = [
     'WMAtlasEVE3',
     'ConnectomeSpecial',
     'FrancoisSpecial',
-    'Tractseg',
+    'Tractseg*',
     'NODDI',
     'WMAtlas',
 ]
+DTI_PROC += [
+    "TractsegCC5", "TractsegPOPTleft", "TractsegSTPREMleft",
+    "TractsegCC6", "TractsegPOPTright", "TractsegSTPREMright",
+    "TractsegCC7", "TractsegSCPleft", "TractsegSTRleft",
+    "TractsegCGleft", "TractsegSCPright", "TractsegSTRright",
+    "TractsegCGright", "TractsegSLFIIIleft", "TractsegSLFIIIright",
+    "TractsegCSTleft", "TractsegSLFIIleft", "TractsegSLFIIright",
+    "TractsegCSTright", "TractsegSLFIleft", "TractsegSLFIright",
+    "TractsegFPTleft", "TractsegSTFOleft", "TractsegSTFOright",
+    "TractsegFPTright", "TractsegSTOCCleft", "TractsegSTOCCright",
+    "TractsegFXleft", "TractsegSTPARleft", "TractsegSTPARright",
+    "TractsegFXright", "TractsegSTPOSTCleft", "TractsegSTPOSTCright",
+    "TractsegICPleft", "TractsegSTPRECleft", "TractsegSTPRECright",
+    "TractsegAFleft", "TractsegICPright", "TractsegSTPREFleft", "TractsegSTPREFright",
+    "TractsegAFright", "TractsegIFOleft", "TractsegSTPREMleft", "TractsegSTPREMright",
+    "TractsegATRleft", "TractsegIFOright", "TractsegTPARleft", "TractsegTPARright",
+    "TractsegATRright", "TractsegILFleft", "TractsegTPRECleft", "TractsegTPRECright",
+    "TractsegCA", "TractsegILFright", "TractsegTPREFleft", "TractsegTPREFright",
+    "TractsegCC", "TractsegMCP", "TractsegTPREMleft", "TractsegTPREMright",
+    "TractsegCC1", "TractsegMLFleft", "TractsegUFleft", "TractsegUFright",
+    "TractsegCC2", "TractsegMLFright",
+    "TractsegCC3", "TractsegORleft", "TractsegCC4",
+    "TractsegORright", "TractsegSTPARleft", "TractsegSTPARright"
+]
+
 
 T1_PROC= [
     'SLANT-TICVv1.2',
