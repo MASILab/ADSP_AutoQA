@@ -227,13 +227,14 @@ class ScriptGeneratorSetup:
                         'EVE3WMAtlas': '/nobackup/p_masi/Singularities/WMAtlas_v1.3.simg',
                         'MNI152WMAtlas': '/nobackup/p_masi/Singularities/WMAtlas_v1.3.simg',
                         'UNest': '/nobackup/p_masi/Singularities/UNest.sif',
-                        'tractseg': ["/nobackup/p_masi/Singularities/tractsegv2.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif"] if not self.args.tractseg_make_DTI else ["/nobackup/p_masi/Singularities/tractsegv2.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif", "/nobackup/p_masi/Singularities/WMAtlas_v1.2.simg"],
+                        'tractseg': ["/nobackup/p_masi/Singularities/tractsegv2.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif"] if not self.args.tractseg_make_DTI else ["/nobackup/p_masi/Singularities/tractsegv2.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif", "/nobackup/p_masi/Singularities/WMAtlas_v1.3.simg"],
                         'MaCRUISE': "/nobackup/p_masi/Singularities/macruise_classern_v3.2.0.simg",
                         'FrancoisSpecial': '/nobackup/p_masi/Singularities/singularity_francois_special_v1.sif',
                         'ConnectomeSpecial': '/nobackup/p_masi/Singularities/ConnectomeSpecial_v1.3.sif',
                         'Biscuit': '/nobackup/p_masi/Singularities/biscuit_FC_v2.2.sif',
                         'NODDI': '/nobackup/p_masi/Singularities/tractoflow_2.2.1_b9a527_2021-04-13.sif',
                         'freewater': '/nobackup/p_masi/Singularities/FreeWaterEliminationv2.sif',
+                        'synthstrip': '/nobackup/p_masi/Singularities/synthstrip.1.5.sif',
                         'DWI_plus_Tractseg': ["/nobackup/p_masi/Singularities/tractsegv2.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif", "/nobackup/p_masi/Singularities/WMAtlas_v1.3.simg"],
                         'BedpostX_plus_Tractseg': ["/nobackup/p_masi/Singularities/tractsegv2.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif", "/nobackup/p_masi/Singularities/WMAtlas_v1.3.simg"]
                     }
@@ -1368,7 +1369,7 @@ class PreQualGenerator(ScriptGenerator):
         else:
             opts = '--topup_first_b0s_only'
 
-        if self.setup.args.skull_stripped:
+        if self.setup.args.skull_stripped and kwargs['needs_synb0']:
             opts += ' --synb0 stripped'
 
         #write the dtiQA_config.csv file (iterate over the rows of the config dataframe)
@@ -1532,7 +1533,7 @@ class PreQualGenerator(ScriptGenerator):
                             seg = self.get_TICV_seg_file(t1, ses_deriv)
                         else:
                             seg = self.get_UNest_seg_file(t1, ses_deriv)
-                        if not seg.exists():
+                        if not seg or not seg.exists():
                             self.add_to_missing(sub, ses, acq, run, 'TICV' if not self.setup.args.use_unest_seg else 'UNest')
                             continue
 
@@ -1596,7 +1597,7 @@ class PreQualGenerator(ScriptGenerator):
                                 seg = self.get_TICV_seg_file(t1, ses_deriv)
                             else:
                                 seg = self.get_UNest_seg_file(t1, ses_deriv)
-                            if not seg.exists():
+                            if not seg or not seg.exists():
                                 self.add_to_missing(sub, ses, acq, run, 'TICV' if not self.setup.args.use_unest_seg else 'UNest')
                                 continue
                     #otherwise, continue as normal
@@ -1905,7 +1906,9 @@ class SynthstripGenerator(ScriptGenerator):
         """
 
         script.write("echo Running Synthstrip...\n")
-        script.write("python3 {} {} {} {} {}\n".format(str(kwargs['wrapper_script_path']), str(kwargs['input_t1']), str(kwargs['ssT1']), str(kwargs['mask']), str(kwargs['wrapper_path'])))
+
+        script.write("singularity run -e --contain -B /tmp:/tmp -B {}:{} -B {}:{} --nv {} -i {} -o {} -m {}\n".format(session_input, session_input, session_output, session_output, self.setup.simg, kwargs['input_t1'], kwargs['ssT1'], kwargs['mask']))
+        #script.write("python3 {} {} {} {} {}\n".format(str(kwargs['wrapper_script_path']), str(kwargs['input_t1']), str(kwargs['ssT1']), str(kwargs['mask']), str(kwargs['wrapper_path'])))
         script.write("echo Finished running Synthstrip. Now removing inputs and copying outputs back...\n")
 
     def generate_synthstrip_scripts(self):
@@ -1913,21 +1916,25 @@ class SynthstripGenerator(ScriptGenerator):
         Generates synthstrip scripts
         """
 
-        #define some stuff
-        wrapper_script_path = Path("/nobackup/p_masi/Singularities/synthstrip_wrapper.py")
-        wrapper_path = Path("/nobackup/p_masi/Singularities/synthstrip-singularity")
+        # #define some stuff
+        # wrapper_script_path = Path("/nobackup/p_masi/Singularities/synthstrip_wrapper.py")
+        # wrapper_path = Path("/nobackup/p_masi/Singularities/synthstrip-singularity")
+        # if not wrapper_script_path.exists() or not wrapper_path.exists():
+        #     wrapper_script_path = Path("/nfs2/harmonization/singularities/synthstrip_wrapper.py")
+        #     wrapper_path = Path("/nfs2/harmonization/singularities/synthstrip-singularity")
 
-        #make sure that these exist and are readable and execuatable
-        assert wrapper_script_path.exists(), "Error: Wrapper script {} does not exist".format(wrapper_script_path)
-        assert wrapper_path.exists(), "Error: Wrapper {} does not exist".format(wrapper_path)
-        assert os.access(wrapper_script_path, os.R_OK) and os.access(wrapper_script_path, os.X_OK), "Error: Wrapper script {} is either not readable or executable".format(wrapper_script_path)
-        assert os.access(wrapper_path, os.R_OK) and os.access(wrapper_path, os.X_OK), "Error: Wrapper {} is either not readable or executable".format(wrapper_path)
+        # #make sure that these exist and are readable and execuatable
+        # assert wrapper_script_path.exists(), "Error: Wrapper script {} does not exist".format(wrapper_script_path)
+        # assert wrapper_path.exists(), "Error: Wrapper {} does not exist".format(wrapper_path)
+        # assert os.access(wrapper_script_path, os.R_OK) and os.access(wrapper_script_path, os.X_OK), "Error: Wrapper script {} is either not readable or executable".format(wrapper_script_path)
+        # assert os.access(wrapper_path, os.R_OK) and os.access(wrapper_path, os.X_OK), "Error: Wrapper {} is either not readable or executable".format(wrapper_path)
 
         #get the T1s
         t1s = self.find_t1s()
 
         #for each T1, check to see if the freesurfer outputs exist
-        for t1 in tqdm(t1s):
+        for t1_f in tqdm(t1s):
+            t1 = Path(t1_f)
             sub, ses, acq, run = self.get_BIDS_fields_t1(t1)     
 
             #first, check to make sure that the data does not already exist
@@ -1937,9 +1944,10 @@ class SynthstripGenerator(ScriptGenerator):
             synthstrip_dir = self.setup.dataset_derivs/(sub)/(ses)/("T1_synthstrip{}{}".format(acq, run))
             assert synthstrip_dir.parent.name != "None" and (synthstrip_dir.parent.name == ses or synthstrip_dir.parent.name == sub), "Error: Synthstrip directory naming is wrong {}".format(synthstrip_dir)
             ssT1_link = synthstrip_dir/("{}".format(t1.name.replace('T1w', 'synthstrip_T1w')))
+            #print(ssT1_link)
             if ssT1_link.exists():
                 continue
-        
+
             self.count += 1
 
             #create the temporary directories
@@ -1949,19 +1957,24 @@ class SynthstripGenerator(ScriptGenerator):
             #create the output target directory
             synthstrip_target = self.setup.output_dir/(sub)/(ses)/("T1_synthstrip{}{}".format(acq, run))
             assert synthstrip_target.parent.name != "None" and (synthstrip_target.parent.name == ses or synthstrip_target.parent.name == sub), "Error: UNest directory naming is wrong {}".format(synthstrip_target)
+            if not synthstrip_target.exists():
+                os.makedirs(synthstrip_target)
 
             #setup output paths (for script generation)
-            input_t1 = session_output/("{}".format(t1.name))
+            input_t1 = session_input/("{}".format(t1.name))
             ssT1 = session_output/("{}".format(t1.name.replace('T1w', 'synthstrip_T1w')))
             mask = session_output/("{}".format(t1.name.replace('T1w', 'synthstrip_T1w_mask')))
 
             #setup the inputs dictionary and outputs list
             self.inputs_dict[self.count] = {'t1': t1}
-            self.outputs = [str(ssT1_link).split(str(synthstrip_dir))[1], str(mask).split(str(session_output))[1]]
+            #self.outputs = [str(ssT1_link).split(str(synthstrip_dir))[1], str(mask).split(str(session_output))[1]]
+            self.outputs[self.count] = []
 
             #start the script generation
-            self.start_script_generation(session_input, session_output, deriv_output_dir=synthstrip_target, wrapper_script=wrapper_script_path, wrapper_path=wrapper_path,
+            self.start_script_generation(session_input, session_output, deriv_output_dir=synthstrip_target,
                                         ssT1=ssT1, mask=mask, input_t1=input_t1)
+            # self.start_script_generation(session_input, session_output, deriv_output_dir=synthstrip_target, wrapper_script_path=wrapper_script_path, wrapper_path=wrapper_path,
+            #                             ssT1=ssT1, mask=mask, input_t1=input_t1)
 
 class EVE3WMAtlasGenerator(ScriptGenerator):
     """
