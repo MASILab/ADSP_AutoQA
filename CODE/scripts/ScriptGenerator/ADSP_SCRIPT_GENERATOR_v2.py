@@ -1809,9 +1809,9 @@ class UNestGenerator(ScriptGenerator):
         script.write("echo Running UNest...\n")
 
         if self.setup.args.skull_stripped:
-            script.write("singularity run -e --contain --home {} -B {}:/INPUTS -B {}:/WORKING_DIR -B {}:/OUTPUTS -B {}:/tmp {} --ticv\n".format(session_input, session_input, kwargs['session_work'], session_output, kwargs['session_temp'], self.setup.simg))
+            script.write("singularity run -e --contain --home {} -B {}:/INPUTS -B {}:/WORKING_DIR -B {}:/OUTPUTS -B {}:/tmp {} --ticv\n".format(session_input, session_input, kwargs['working_dir'], session_output, kwargs['temp_dir'], self.setup.simg))
         else:
-            script.write("singularity run -e --contain --home {} -B {}:/INPUTS -B {}:/WORKING_DIR -B {}:/OUTPUTS -B {}:/tmp {} --ticv --w_skull\n".format(session_input, session_input, kwargs['session_work'], session_output, kwargs['session_temp'], self.setup.simg))
+            script.write("singularity run -e --contain --home {} -B {}:/INPUTS -B {}:/WORKING_DIR -B {}:/OUTPUTS -B {}:/tmp {} --ticv --w_skull\n".format(session_input, session_input, kwargs['working_dir'], session_output, kwargs['temp_dir'], self.setup.simg))
 
         script.write("echo Finished running UNest. Now removing inputs and copying outputs back...\n")
 
@@ -1839,8 +1839,9 @@ class UNestGenerator(ScriptGenerator):
             print("Skull stripped flag is on. Will look for skull stripped T1 for UNest.")
 
         #for each T1, check to see if the freesurfer outputs exist
-        for t1 in tqdm(t1s):
-            sub, ses, acq, run = self.get_BIDS_fields_t1(t1)
+        for t1_f in tqdm(t1s):
+            sub, ses, acq, run = self.get_BIDS_fields_t1(t1_f)
+            t1 = Path(t1_f)
 
             unest_dir = unest_dir = self.setup.dataset_derivs/(sub)/(ses)/("UNest{}{}".format(acq, run))
             assert unest_dir.parent.name != "None" and (unest_dir.parent.name == ses or unest_dir.parent.name == sub), "Error: UNest directory naming is wrong {}".format(unest_dir)
@@ -1866,12 +1867,12 @@ class UNestGenerator(ScriptGenerator):
             #create the temporary directories
             session_temp = root_temp/(sub)/("{}{}{}".format(ses,acq,run))
             session_work = root_working/(sub)/("{}{}{}".format(ses,acq,run))
-            (session_input, session_output) = self.make_session_dirs(sub, ses, acq, run, tmp_input_dir=self.setup.tmp_input_dir,
+            (session_input, session_output, session_work, session_temp) = self.make_session_dirs(sub, ses, acq, run, tmp_input_dir=self.setup.tmp_input_dir,
                                             tmp_output_dir=self.setup.tmp_output_dir, temp_dir=session_temp, working_dir=session_work,
                                             has_working=True, has_temp=True)
 
             #setup the output target directory
-            unest_target = self.output_dir/(sub)/(ses)/("UNest{}{}".format(acq, run))
+            unest_target = self.setup.output_dir/(sub)/(ses)/("UNest{}{}".format(acq, run))
             assert unest_target.parent.name != "None" and (unest_target.parent.name == ses or unest_target.parent.name == sub), "Error: UNest directory naming is wrong {}".format(unest_target)
             if not unest_target.exists():
                 os.makedirs(unest_target)
