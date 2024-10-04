@@ -14,6 +14,7 @@ DTI_PROC = [
     'Tractseg*',
     'NODDI',
     'WMAtlas',
+    'freewater'
 ]
 DTI_PROC += [
     "TractsegCC5", "TractsegPOPTleft", "TractsegSTPREMleft",
