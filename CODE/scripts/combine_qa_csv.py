@@ -17,29 +17,26 @@ DTI_PROC = [
     'freewater'
 ]
 DTI_PROC += [
-    "TractsegCC5", "TractsegPOPTleft", "TractsegSTPREMleft",
-    "TractsegCC6", "TractsegPOPTright", "TractsegSTPREMright",
-    "TractsegCC7", "TractsegSCPleft", "TractsegSTRleft",
-    "TractsegCGleft", "TractsegSCPright", "TractsegSTRright",
-    "TractsegCGright", "TractsegSLFIIIleft", "TractsegSLFIIIright",
-    "TractsegCSTleft", "TractsegSLFIIleft", "TractsegSLFIIright",
-    "TractsegCSTright", "TractsegSLFIleft", "TractsegSLFIright",
-    "TractsegFPTleft", "TractsegSTFOleft", "TractsegSTFOright",
-    "TractsegFPTright", "TractsegSTOCCleft", "TractsegSTOCCright",
-    "TractsegFXleft", "TractsegSTPARleft", "TractsegSTPARright",
-    "TractsegFXright", "TractsegSTPOSTCleft", "TractsegSTPOSTCright",
-    "TractsegICPleft", "TractsegSTPRECleft", "TractsegSTPRECright",
-    "TractsegAFleft", "TractsegICPright", "TractsegSTPREFleft", "TractsegSTPREFright",
-    "TractsegAFright", "TractsegIFOleft", "TractsegSTPREMleft", "TractsegSTPREMright",
-    "TractsegATRleft", "TractsegIFOright", "TractsegTPARleft", "TractsegTPARright",
-    "TractsegATRright", "TractsegILFleft", "TractsegTPRECleft", "TractsegTPRECright",
-    "TractsegCA", "TractsegILFright", "TractsegTPREFleft", "TractsegTPREFright",
-    "TractsegCC", "TractsegMCP", "TractsegTPREMleft", "TractsegTPREMright",
-    "TractsegCC1", "TractsegMLFleft", "TractsegUFleft", "TractsegUFright",
-    "TractsegCC2", "TractsegMLFright",
-    "TractsegCC3", "TractsegORleft", "TractsegCC4",
-    "TractsegORright", "TractsegSTPARleft", "TractsegSTPARright"
+    "TractsegAFleft", "TractsegAFright", "TractsegATRleft", "TractsegATRright",
+    "TractsegCA", "TractsegCC", "TractsegCC1", "TractsegCC2", "TractsegCC3",
+    "TractsegCC4", "TractsegCC5", "TractsegCC6", "TractsegCC7", "TractsegCGleft",
+    "TractsegCGright", "TractsegCSTleft", "TractsegCSTright", "TractsegFPTleft",
+    "TractsegFPTright", "TractsegFXleft", "TractsegFXright", "TractsegICPleft",
+    "TractsegICPright", "TractsegIFOleft", "TractsegIFOright", "TractsegILFleft",
+    "TractsegILFright", "TractsegMCP", "TractsegMLFleft", "TractsegMLFright",
+    "TractsegORleft", "TractsegORright", "TractsegPOPTleft", "TractsegPOPTright",
+    "TractsegSCPleft", "TractsegSCPright", "TractsegSLFIIIleft", "TractsegSLFIIIright",
+    "TractsegSLFIIleft", "TractsegSLFIIright", "TractsegSLFIleft", "TractsegSLFIright",
+    "TractsegSTFOleft", "TractsegSTFOright", "TractsegSTOCCleft", "TractsegSTOCCright",
+    "TractsegSTPARleft", "TractsegSTPARright", "TractsegSTPOSTCleft", "TractsegSTPOSTCright",
+    "TractsegSTPRECleft", "TractsegSTPRECright", "TractsegSTPREFleft", "TractsegSTPREFright",
+    "TractsegSTPREMleft", "TractsegSTPREMright", "TractsegSTRleft", "TractsegSTRright",
+    "TractsegTOCCleft", "TractsegTOCCright", "TractsegTPARleft", "TractsegTPARright",
+    "TractsegTPOSTCleft", "TractsegTPOSTCright", "TractsegTPRECleft", "TractsegTPRECright",
+    "TractsegTPREFleft", "TractsegTPREFright", "TractsegTPREMleft", "TractsegTPREMright",
+    "TractsegUFleft", "TractsegUFright"
 ]
+
 
 
 T1_PROC= [
