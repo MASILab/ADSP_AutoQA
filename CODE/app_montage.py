@@ -105,15 +105,26 @@ def get_leaf_dicts(d, path=None, curr_dict=None):
     if curr_dict is None:
         curr_dict = {}
     leaf_dicts = []
+
+    nested_keys = {}
+    leaf_keys = {}
     for key, value in d.items():
         #print(key)
         if isinstance(value, dict):
-            new_path = path + [key]
-            curr_dict[get_tag_type(key)] = key  #### For some reason, curr_dict is carrying over previous values
-            leaf_dicts.extend(get_leaf_dicts(value, new_path, curr_dict))
+            nested_keys[key] = (value,d)
         else:
-            leaf_dicts.append((path, d)) #add the path and the dictionary to the list
-            break
+            leaf_keys[key] = (value,d)
+
+    for nested_key, (nested_value, nested_dict) in nested_keys.items():
+        new_path = path + [nested_key]
+        curr_dict[get_tag_type(nested_key)] = nested_key
+
+        leaf_dicts.extend(get_leaf_dicts(nested_value, new_path, curr_dict))
+    
+    for leaf_key, (leaf_value, leaf_dict) in leaf_keys.items():
+        leaf_dicts.append((path, leaf_dict))
+        break
+        
     return leaf_dicts
 
 def set_file_permissions(file_path, group_name='p_masi', permissions=0o775):
