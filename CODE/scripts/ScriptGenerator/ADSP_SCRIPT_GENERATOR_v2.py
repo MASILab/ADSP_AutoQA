@@ -1514,11 +1514,11 @@ class PreQualGenerator(ScriptGenerator):
                 if not similar or self.setup.args.separate_prequal: #RUN dwis SEPARATELY
 
                     if need_json_dicts is None: #we dont know, so just set to None
-                        PEaxis, PEsign, PEunknown = None, None, None
+                        PEaxis, PEsign, PEunknown = None, [None], None
                     else:
                         (PEaxis, PEsign, PEunknown) = get_PE_dirs([need_json_dicts[dir_num]], [need_jsons[dir_num]], single=True) #returns a single tuple
                     #definitely needs a T1 for synb0
-                        needs_synb0 = True
+                    needs_synb0 = True
                     #check for a T1
                     t1 = self.get_t1(dwi_dir.parent/("anat"), sub, ses)
                     if not t1:
