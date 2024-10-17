@@ -1513,8 +1513,8 @@ class PreQualGenerator(ScriptGenerator):
                 #get the PE direction for each of the scans
                 if not similar or self.setup.args.separate_prequal: #RUN dwis SEPARATELY
 
-                    if need_json_dicts is None: #we dont know, so just set to None
-                        PEaxis, PEsign, PEunknown = None, ['+'], None
+                    if need_json_dicts is None: #we dont know, so just set to a default
+                        PEaxis, PEsign, PEunknown = ['j'], ['+'], None
                     else:
                         (PEaxis, PEsign, PEunknown) = get_PE_dirs([need_json_dicts[dir_num]], [need_jsons[dir_num]], single=True) #returns a single tuple
                     #definitely needs a T1 for synb0
