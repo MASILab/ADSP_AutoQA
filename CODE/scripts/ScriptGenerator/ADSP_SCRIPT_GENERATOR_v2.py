@@ -1514,7 +1514,7 @@ class PreQualGenerator(ScriptGenerator):
                 if not similar or self.setup.args.separate_prequal: #RUN dwis SEPARATELY
 
                     if need_json_dicts is None: #we dont know, so just set to a default
-                        PEaxis, PEsign, PEunknown = ['j'], ['+'], None
+                        PEaxis, PEsign, PEunknown = 'j', ['+'], None
                     else:
                         (PEaxis, PEsign, PEunknown) = get_PE_dirs([need_json_dicts[dir_num]], [need_jsons[dir_num]], single=True) #returns a single tuple
                     #definitely needs a T1 for synb0
