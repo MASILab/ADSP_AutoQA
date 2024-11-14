@@ -64,12 +64,14 @@ def pa():
     p.add_argument('--no_scp', action='store_true', help="If you do not want to scp the outputs to ACCRE (i.e. cp -L instead of scp)")
     p.add_argument('--src_server', type=str, default='landman01.accre.vanderbilt.edu', help="Source server for scp")
     p.add_argument('--separate_prequal', action='store_true', help="If you want to run all DWI separately through PreQual, regardless of whether the can be run together")
+    p.add_argument('--force_combine_prequal', action='store_true', help="If you want to forcibly run all the dwis in a session together for a dataset")
     p.add_argument('--custom_home', default='', type=str, help="Path to the custom home directory for the user if --no_accre is set (for Tractseg)")
     p.add_argument('--TE_tolerance_PQ', default=0.01, type=float, help="Tolerance for TE differences in determining scan similarity for PreQual")
     p.add_argument('--TR_tolerance_PQ', default=0.01, type=float, help="Tolerance for TR differences in determining scan similarity for PreQual")
     p.add_argument('--accre_gpu', action='store_true', help="If you want to run the pipeline on ACCRE with a GPU (note, you may need to specify simgs with a CUDA installation)")
     p.add_argument('--tractseg_make_DTI', action='store_true', help="If you want to make the DTI files for Tractseg")
     p.add_argument('--tractseg_DTI_use_all_shells', action='store_true', help="If you want to forego the shelling for calculating DTI measures")
+    p.add_argument('--select_sessions_list', type=str, default='', help="If you want to run only a subset of scans/sessions, provide a path to a list of sessions directories to run FOR THAT SPECIFIC PIPELINE. (e.g. for TICV, provide a list of T1s, for PreQual provide a list of dwi dirs, for EVE3 provide a list of PreQual directories, etc.)")
     return p.parse_args()
 
 class ScriptGeneratorSetup:
@@ -591,10 +593,19 @@ class ScriptGenerator:
         """
         Return a list of T1s for the dataset
         """
-        print("Finding all T1s...")
-        find_cmd = "find {} -mindepth 3 -maxdepth 4 \( -type f -o -type l \) -name '*T1w.nii.gz' | grep -v derivatives".format(str(self.setup.root_dataset_path))
-        result = subprocess.run(find_cmd, shell=True, capture_output=True, text=True).stdout
-        files = result.strip().splitlines()
+        if self.setup.args.select_sessions_list == '':
+            print("Finding all T1s...")
+            find_cmd = "find {} -mindepth 3 -maxdepth 4 \( -type f -o -type l \) -name '*T1w.nii.gz' | grep -v derivatives".format(str(self.setup.root_dataset_path))
+            result = subprocess.run(find_cmd, shell=True, capture_output=True, text=True).stdout
+            files = result.strip().splitlines()
+        else:
+            lst_path = Path(self.setup.args.select_sessions_list)
+            assert lst_path.exists(), "Error: select_sessions_list file {} that was specified does not exist".format(str(lst_path))
+            print("Finding all T1s from select_sessions_list {}...".format(str(lst_path)))
+            with open(lst_path, 'r') as f:
+                files = f.readlines()
+            files = [x.strip() for x in files]
+
         return files
 
 
@@ -602,30 +613,54 @@ class ScriptGenerator:
         """
         Return a list of all DWIs in the dataset
         """
-        print("Finding all DWIs...")
-        find_cmd = "find {} -mindepth 3 -maxdepth 4 \( -type f -o -type l \) -name '*dwi.nii.gz' | grep -v derivatives".format(str(self.setup.root_dataset_path))
-        result = subprocess.run(find_cmd, shell=True, capture_output=True, text=True).stdout
-        files = result.strip().splitlines()
+        if self.setup.args.select_sessions_list == '':
+            print("Finding all DWIs...")
+            find_cmd = "find {} -mindepth 3 -maxdepth 4 \( -type f -o -type l \) -name '*dwi.nii.gz' | grep -v derivatives".format(str(self.setup.root_dataset_path))
+            result = subprocess.run(find_cmd, shell=True, capture_output=True, text=True).stdout
+            files = result.strip().splitlines()
+        else:
+            lst_path = Path(self.setup.args.select_sessions_list)
+            assert lst_path.exists(), "Error: select_sessions_list file {} that was specified does not exist".format(str(lst_path))
+            print("Finding all DWIs from select_sessions_list {}...".format(str(lst_path)))
+            with open(lst_path, 'r') as f:
+                files = f.readlines()
+            files = [x.strip() for x in files]
         return files
 
     def get_PreQual_dirs(self):
         """
         Returns a list of all the PreQual directories in the dataset
         """
-        print("Finding all PreQuals...")
-        find_cmd = "find {} -mindepth 2 -maxdepth 3 -type d -name 'PreQual*'".format(str(self.setup.dataset_derivs))
-        result = subprocess.run(find_cmd, shell=True, capture_output=True, text=True).stdout
-        files = result.strip().splitlines()
+        if self.setup.args.select_sessions_list == '':
+            print("Finding all PreQuals...")
+            find_cmd = "find {} -mindepth 2 -maxdepth 3 -type d -name 'PreQual*'".format(str(self.setup.dataset_derivs))
+            result = subprocess.run(find_cmd, shell=True, capture_output=True, text=True).stdout
+            files = result.strip().splitlines()
+        else:
+            lst_path = Path(self.setup.args.select_sessions_list)
+            assert lst_path.exists(), "Error: select_sessions_list file {} that was specified does not exist".format(str(lst_path))
+            print("Finding all PreQuals from select_sessions_list {}...".format(str(lst_path)))
+            with open(lst_path, 'r') as f:
+                dirs = f.readlines()
+            dirs = [x.strip() for x in dirs]
         return files
 
     def get_dwi_dirs(self):
         """
         Return a list of all raw dwi directories in the dataset
         """
-        print("Finding all DWI directories...")
-        find_cmd = "find {} -mindepth 2 -maxdepth 3 -type d -name '*dwi' | grep -v derivatives".format(str(self.setup.root_dataset_path))
-        result = subprocess.run(find_cmd, shell=True, capture_output=True, text=True).stdout
-        dirs = result.strip().splitlines()
+        if self.setup.args.select_sessions_list == '':
+            print("Finding all DWI directories...")
+            find_cmd = "find {} -mindepth 2 -maxdepth 3 -type d -name '*dwi' | grep -v derivatives".format(str(self.setup.root_dataset_path))
+            result = subprocess.run(find_cmd, shell=True, capture_output=True, text=True).stdout
+            dirs = result.strip().splitlines()
+        else:
+            lst_path = Path(self.setup.args.select_sessions_list)
+            assert lst_path.exists(), "Error: select_sessions_list file {} that was specified does not exist".format(str(lst_path))
+            print("Finding all DWI directories from select_sessions_list {}...".format(str(lst_path)))
+            with open(lst_path, 'r') as f:
+                dirs = f.readlines()
+            dirs = [x.strip() for x in dirs]
         return dirs
 
     def get_PreQual_dirs_from_dwi(self, dwis, similar=True):
@@ -1457,10 +1492,18 @@ class PreQualGenerator(ScriptGenerator):
             #check to see if the jsons have the same acquisition parameters or not (within a small margin)
             try:
                 json_dicts = [get_json_dict(x) for x in jsons]
-                similar = check_json_params_similarity(json_dicts, self.setup.args)
+                if self.setup.args.force_combine_prequal:
+                    similar = True
+                    print("Forcing PreQuals to be combined for {}_{}".format(sub, ses))
+                else:
+                    similar = check_json_params_similarity(json_dicts, self.setup.args)
             except:
-                similar = False
-                print("Error: Could not read json files {}. Assuming different acquisitions.".format(jsons))
+                if self.setup.args.force_combine_prequal:
+                    similar = True
+                    print("Forcing PreQuals to be combined for {}_{}".format(sub, ses))
+                else:
+                    similar = False
+                    print("Error: Could not read json files {}. Assuming different acquisitions.".format(jsons))
 
             if similar and not self.setup.args.separate_prequal:
                 #if similar, run them together
@@ -1541,7 +1584,7 @@ class PreQualGenerator(ScriptGenerator):
                     self.warnings[self.count] = ''
                     #warning if PEunknown
                     if PEunknown:
-                        self.warnings[self.count] += "Warning: Unknown PE direction. Assuming j.\n"
+                        self.warnings[self.count] += "echo Warning: Unknown PE direction. Assuming j.\n"
                     #create the directories
                     (session_input, session_output) = self.make_session_dirs(sub, ses, acq, run, tmp_input_dir=self.setup.tmp_input_dir,
                                             tmp_output_dir=self.setup.tmp_output_dir)
@@ -1605,7 +1648,7 @@ class PreQualGenerator(ScriptGenerator):
                     self.warnings[self.count] = ''
                     #PE unknown warning
                     if any(PEunknowns):
-                        self.warnings[self.count] += "Warning: Unknown PE direction for at least one scan. Assuming j for unknowns.\n"
+                        self.warnings[self.count] += "echo Warning: Unknown PE direction for at least one scan. Assuming j for unknowns.\n"
                     
                     #create the directories (to hold temporary files during processing) for the session
                     (session_input, session_output) = self.make_session_dirs(sub, ses, acq, run, tmp_input_dir=self.setup.tmp_input_dir,
@@ -1626,7 +1669,7 @@ class PreQualGenerator(ScriptGenerator):
                         else:
                             self.inputs_dict[self.count]['t1'] = {'src_path':t1, 'targ_name': 't1.nii.gz'}
                             self.warnings[self.count] += "Running synb0 with raw T1\n"
-                        self.warnings[self.count] += "Using T1 for synb0, as no ReversePE scans were found.\n"
+                        self.warnings[self.count] += "echo Using T1 for synb0, as no ReversePE scans were found.\n"
                     self.outputs[self.count] = []
 
                     #setup the dtiQA config file
@@ -3136,10 +3179,10 @@ class DWI_plus_TractsegGenerator(ScriptGenerator):
         script.write('done\n\n')
 
         script.write("echo Done computing measures per bundle. Now deleting temp inputs and re-organizing outputs...\n")
-        #script.write("rm -r {}/tractseg/TOM\n".format(kwargs['temp_dir']))
-        #script.write("rm -r {}/tractseg/peaks.nii.gz\n".format(kwargs['temp_dir']))
-        #script.write("rm -r {}/dwmri.nii.gz\n".format(kwargs['temp_dir']))
-        #script.write("rm -r {}/dwmri_1mm_iso.nii.gz\n".format(kwargs['temp_dir']))
+        script.write("rm -r {}/tractseg/TOM\n".format(kwargs['temp_dir']))
+        script.write("rm -r {}/tractseg/peaks.nii.gz\n".format(kwargs['temp_dir']))
+        script.write("rm -r {}/dwmri.nii.gz\n".format(kwargs['temp_dir']))
+        script.write("rm -r {}/dwmri_1mm_iso.nii.gz\n".format(kwargs['temp_dir']))
         #script.write("rm {}/dwmri_tensor_fa.nii.gz\n".format(kwargs['temp_dir']))
         #script.write("rm {}/dwmri_tensor_md.nii.gz\n".format(kwargs['temp_dir']))
         #script.write("rm {}/dwmri_tensor_ad.nii.gz\n".format(kwargs['temp_dir']))
