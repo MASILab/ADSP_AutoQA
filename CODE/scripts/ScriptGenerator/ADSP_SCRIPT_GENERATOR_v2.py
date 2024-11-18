@@ -3013,7 +3013,7 @@ class FreewaterGenerator(ScriptGenerator):
         """
         
         script.write("echo Running FreeWater...\n")
-        script.write("echo singularity run -e --contain -B {}:/input -B {}:/output --home {} -B /tmp:/tmp -B {}:/dev/shm {} dwmri.nii.gz dwmri.bval dwmri.bvec mask.nii.gz\n".format(session_input, session_output, session_input, session_input, self.setup.simg))
+        script.write("singularity run -e --contain -B {}:/input -B {}:/output --home {} -B /tmp:/tmp -B {}:/dev/shm {} dwmri.nii.gz dwmri.bval dwmri.bvec mask.nii.gz\n".format(session_input, session_output, session_input, session_input, self.setup.simg))
         #singularity run -B inputs/:/input -B outputs/:/output ../FreeWaterEliminationv2.sif dwmri.nii.gz dwmri.bval dwmri.bvec mask.nii.gz
 
     def generate_freewater_scripts(self):
