@@ -635,7 +635,7 @@ class ScriptGenerator:
             print("Finding all PreQuals...")
             find_cmd = "find {} -mindepth 2 -maxdepth 3 -type d -name 'PreQual*'".format(str(self.setup.dataset_derivs))
             result = subprocess.run(find_cmd, shell=True, capture_output=True, text=True).stdout
-            files = result.strip().splitlines()
+            dirs = result.strip().splitlines()
         else:
             lst_path = Path(self.setup.args.select_sessions_list)
             assert lst_path.exists(), "Error: select_sessions_list file {} that was specified does not exist".format(str(lst_path))
@@ -643,7 +643,7 @@ class ScriptGenerator:
             with open(lst_path, 'r') as f:
                 dirs = f.readlines()
             dirs = [x.strip() for x in dirs]
-        return files
+        return dirs
 
     def get_dwi_dirs(self):
         """
@@ -1455,11 +1455,11 @@ class PreQualGenerator(ScriptGenerator):
         """
         if readout_times is None:
             readout_times = [0.05]*len(dwis)
-            self.warnings[self.count] += "Warning: Could not read readout times from json files. Assuming 0.05 for all scans.\n"
+            self.warnings[self.count] += "echo Warning: Could not read readout times from json files. Assuming 0.05 for all scans.\n"
         self.config[self.count] = pd.DataFrame(columns=['dwi', 'sign', 'readout'])
         for dwi, sign, readout in zip(dwis, PEsigns, readout_times):
             if readout == None:
-                self.warnings[self.count] += "Warning: Could not read readout times from json files. Assuming 0.05 for all scans.\n"
+                self.warnings[self.count] += "echo Warning: Could not read readout times from json files. Assuming 0.05 for all scans.\n"
                 readout = 0.05
             row = {'dwi': dwi, 'sign': sign, 'readout': readout}
             self.config[self.count] = pd.concat([self.config[self.count], pd.Series(row).to_frame().T], ignore_index=True)
@@ -1618,8 +1618,12 @@ class PreQualGenerator(ScriptGenerator):
                 else: #run dwis TOGETHER
                     print('******************************************************')
                     print("Running PreQuals together for {}_{}".format(sub, ses))
-                    (PEaxes, PEsigns, PEunknowns) = get_PE_dirs(json_dicts, jsons, single=False) #returns a tuple of tuples
-                        #make sure, for new VMAP, that the PEdirection is negative for the acq-ReversePE
+                    try:
+                        (PEaxes, PEsigns, PEunknowns) = get_PE_dirs(json_dicts, jsons, single=False) #returns a tuple of tuples
+                    except:
+                        print("No json dicts defined for {}_{}. Assuming j+ and 0.05 for all scans.".format(sub, ses))
+                        PEaxes, PEsigns, PEunknowns = ['j']*len(dwis), ['+']*len(dwis), [True]*len(dwis)
+                    #make sure, for new VMAP, that the PEdirection is negative for the acq-ReversePE
                     #determine if it needs a T1 or not
                     needs_synb0 = check_needs_synb0(PEaxes, PEsigns, PEunknowns)
                     if needs_synb0 is None:
