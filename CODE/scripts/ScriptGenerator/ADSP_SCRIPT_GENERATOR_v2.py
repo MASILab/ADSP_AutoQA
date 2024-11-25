@@ -684,14 +684,14 @@ class ScriptGenerator:
         """
         Return the BIDS tags for a dwi scan
         """
-        pattern = r'(sub-\w+)(?:_(ses-\w+))?(?:_(acq-\w+))?(?:_(run-\d{1,2}))?_dwi'
+        pattern = r'(sub-\w+)(?:_(ses-\w+))?(?:_(acq-\w+))?(?:_(run-\d{1,3}))?_dwi'
         matches = re.findall(pattern, dwi_path.name)
         return matches[0]
         #sub, ses, acq, run = matches[0][0], matches[0][1], matches[0][2], matches[0][3]
         #return sub, ses, acq, run
 
     def get_BIDS_fields_t1(self, t1_path):
-        pattern = r'(sub-\w+)(?:_(ses-\w+))?(?:_(acq-\w+))?(?:_(run-\d{1,2}))?_T1w'
+        pattern = r'(sub-\w+)(?:_(ses-\w+))?(?:_(acq-\w+))?(?:_(run-\d{1,3}))?_T1w'
         matches = re.findall(pattern, str(t1_path).split('/')[-1])
         sub, ses, acq, run = matches[0][0], matches[0][1], matches[0][2], matches[0][3]
         return sub, ses, acq, run
