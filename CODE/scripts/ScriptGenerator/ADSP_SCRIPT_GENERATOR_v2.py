@@ -645,6 +645,24 @@ class ScriptGenerator:
             dirs = [x.strip() for x in dirs]
         return dirs
 
+    def get_EVE3WMAtlas_dirs(self):
+        """
+        Returns a list of all the WMAtlasEVE3 directories in the dataset
+        """
+        if self.setup.args.select_sessions_list == '':
+            print("Finding all EVE3WMAtlas directories...")
+            find_cmd = "find {} -mindepth 2 -maxdepth 3 -type d -name 'WMAtlasEVE3*'".format(str(self.setup.dataset_derivs))
+            result = subprocess.run(find_cmd, shell=True, capture_output=True, text=True).stdout
+            dirs = result.strip().splitlines()
+        else:
+            lst_path = Path(self.setup.args.select_sessions_list)
+            assert lst_path.exists(), "Error: select_sessions_list file {} that was specified does not exist".format(str(lst_path))
+            print("Finding all WMAtlasEVE3s from select_sessions_list {}...".format(str(lst_path)))
+            with open(lst_path, 'r') as f:
+                dirs = f.readlines()
+            dirs = [x.strip() for x in dirs]
+        return dirs
+
     def get_dwi_dirs(self):
         """
         Return a list of all raw dwi directories in the dataset
@@ -836,6 +854,18 @@ class ScriptGenerator:
             return False
         return True
 
+    def has_FreesurferWhiteMatterMask_outputs(self, wmmask_dir):
+        """
+        Return True if the Freesurfer white matter mask outputs exist
+        """
+
+        wmmask = wmmask_dir/("wm_mask_dwi.nii.gz")
+        metrics = wmmask_dir/("metrics.json")
+
+        if not wmmask.exists() or not metrics.exists():
+            return False
+        return True
+
     def get_t1(self, path, sub, ses):
         #given a path to the anat folder, returns a T1 if it exists
         t1s = [x for x in path.glob('*') if re.match("^.*T1w\.nii\.gz$", x.name)]
@@ -994,6 +1024,22 @@ class ScriptGenerator:
             acq = ''
         return acq, run
 
+    def get_BIDS_acq_run_from_EVE3dir(self, PQdir):
+        """
+        Given an EVE3 directory, return the acq, run BIDS fields 
+        """
+        suff = PQdir.name.split('WMAtlasEVE3')[1]
+        if 'run' in suff:
+            run = 'run' + suff.split('run')[1]
+            suff = suff.split('run')[0]
+        else:
+            run = ''
+        if 'acq' in suff:
+            acq = 'acq' + suff.split('acq')[1]
+        else:
+            acq = ''
+        return acq, run
+
     def get_BIDS_fields_from_PQdir(self, pqdir):
         """
         Given a PreQual directory, return the BIDS fields
@@ -1006,6 +1052,20 @@ class ScriptGenerator:
             sub = pqdir.parent.parent.name
             ses = pqdir.parent.name
         acq, run = self.get_BIDS_acq_run_from_PQdir(pqdir)
+        return sub, ses, acq, run
+
+    def get_BIDS_fields_from_EVE3dir(self, pqdir):
+        """
+        Given a EVE3 directory, return the BIDS fields
+        """
+        #get the sub, ses from the directory
+        if pqdir.parent.parent.name == 'derivatives':
+            sub = pqdir.parent.name
+            ses = ''
+        else:
+            sub = pqdir.parent.parent.name
+            ses = pqdir.parent.name
+        acq, run = self.get_BIDS_acq_run_from_EVE3dir(pqdir)
         return sub, ses, acq, run
 
     def add_to_missing(self, sub, ses, acq, run, reason):
@@ -3492,6 +3552,68 @@ class BedpostX_plus_DWI_plus_TractsegGenerator(ScriptGenerator):
             #start the script generation
             self.start_script_generation(session_input, session_output, deriv_output_dir=tractsegdwi_target, temp_dir=session_temp,
                                         tractseg_setup=True, accre_home=accre_home_directory, temp_is_output=True)
+
+#for calcualting the average FA, MD, AD, RD values for the whole brain white matter using freesurfer
+class FreesurferWhiteMatterMaskGenerator(ScriptGenerator):
+
+    def __init__(self, setup_object):
+        """
+        Class for taking using WMAtlasEVE3 and freesurfer to calculate the average FA, MD, AD, RD values for the whole brain white matter
+
+        Also creates a freesurfer white matter mask in DWI space
+        """
+        super().__init__(setup_object=setup_object)
+        #self.warnings = {}
+        self.outputs = {}
+        self.inputs_dict = {}
+
+    def generate_freesurfer_whitematter_mask_scripts(self):
+        """
+        Creates scripts for running freesurfer white matter mask DTI metrics
+        """
+
+        #gets the wmatlaseve3 directories
+        eve3_dirs = self.get_EVE3WMAtlas_dirs()
+
+        for eve3_dir in tqdm(eve3_dirs):
+            #get the BIDS fields from the EVE3 directory
+            sub, ses, acq, run = self.get_BIDS_fields_from_EVE3dir(eve3_dir)
+            
+            #check to make sure that the outputs for the pipeline dont already exist
+            wmmask_outdir = self.setup.output_dir/(sub)/(ses)/("FreesurferWhiteMatterMask{}{}".format(acq, run))
+            if self.has_FreesurferWhiteMatterMask_outputs(wmmask_outdir):
+                continue
+            
+            #check to make sure the outputs for PreQual exist
+            prequal_dir = self.setup.dataset_derivs/(sub)/(ses)/("PreQual{}{}".format(acq, run))
+            if not self.has_PreQual_outputs(prequal_dir):
+                self.add_to_missing(sub, ses, acq, run, 'PreQual')
+                continue
+
+            #check to make sure that the outputs for EVE3 exist
+            if not self.has_EVE3WMAtlas_outputs(eve3_dir):
+                self.add_to_missing(sub, ses, acq, run, 'EVE3WMAtlas')
+                continue
+
+            #get the T1 that was used for PreQual. If we cannot get it, then select it again using the function
+            t1 = self.get_prov_t1(prequal_dir)
+            if not t1:
+                #get the T1 using the function, and print out a provenance warning
+                print("Warning: Could not get provenance T1 for {}/{}/{}".format(sub,ses,prequal_dir))
+                t1 = self.get_t1(self.setup.root_dataset_path/(sub)/(ses)/("anat"), sub, ses)
+                if not t1:
+                    self.add_to_missing(sub, ses, acq, run, 'T1')
+                    continue
+            
+            #check to see if the freesurfer outputs exist
+            fs_dir = self.setup.dataset_derivs/(sub)/(ses)/("freesurfer{}{}".format(acq, run))
+            if not check_freesurfer_outputs(fs_dir):
+                self.add_to_missing(sub, ses, acq, run, 'freesurfer')
+                continue
+
+            #now that we have all the necessary inputs, we can start the script generation TODO
+
+            ####### TODO
 
 #for Kurt: run scilpy scipts on tractseg dirs
 class Scilpy_on_TractsegGenerator(ScriptGenerator):
