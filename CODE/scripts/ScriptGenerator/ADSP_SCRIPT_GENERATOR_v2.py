@@ -955,9 +955,9 @@ class ScriptGenerator:
                     #return None
                     obtained_t1=False
         if not obtained_t1:
-            #check the EVE3 registration directory instead
-            EVE3_dir = dir.parent / ("WMAtlasEVE3{}".format(dir.name.split('WMAtlasEVE3')[1]))
             if not EVE3:
+                #check the EVE3 registration directory instead/as well
+                EVE3_dir = dir.parent / ("WMAtlasEVE3{}".format(dir.name.split('PreQual')[1]))
                 return self.get_prov_t1(EVE3_dir, EVE3=True)
             else:
                 return None
@@ -1314,6 +1314,7 @@ class ScriptGenerator:
 
             #write the specifics for the pipeline
             tmp_input_targ_dict = {'input_targets': input_targets}
+            #print(**kwargs)
             self.PIPELINE_GENERATE_MAP[self.setup.args.pipeline](script, session_input, session_output, **kwargs | tmp_input_targ_dict)
 
             #remove the inputs
@@ -3596,7 +3597,9 @@ class FreesurferWhiteMatterMaskGenerator(ScriptGenerator):
         self.outputs = {}
         self.inputs_dict = {}
 
-    def freesurfer_whitematter_mask_script_generate(self, script, session_input, session_output, **kwargs):
+        self.generate_freesurfer_whitematter_mask_scripts()
+
+    def freesurfer_white_matter_mask_script_generate(self, script, session_input, session_output, **kwargs):
         """
         Creates a single script for running freesurfer white matter mask DTI metrics
         """
@@ -3615,7 +3618,8 @@ class FreesurferWhiteMatterMaskGenerator(ScriptGenerator):
         #gets the wmatlaseve3 directories
         eve3_dirs = self.get_EVE3WMAtlas_dirs()
 
-        for eve3_dir in tqdm(eve3_dirs):
+        for eve3_dir_p in tqdm(eve3_dirs):
+            eve3_dir = Path(eve3_dir_p)
             #get the BIDS fields from the EVE3 directory
             sub, ses, acq, run = self.get_BIDS_fields_from_EVE3dir(eve3_dir)
             
@@ -3626,7 +3630,8 @@ class FreesurferWhiteMatterMaskGenerator(ScriptGenerator):
             
             #check to make sure the outputs for PreQual exist
             prequal_dir = self.setup.dataset_derivs/(sub)/(ses)/("PreQual{}{}".format(acq, run))
-            if not self.has_PreQual_outputs(prequal_dir):
+            #if not self.has_PreQual_outputs(prequal_dir):
+            if not all(self.check_PQ_outputs(prequal_dir)):
                 self.add_to_missing(sub, ses, acq, run, 'PreQual')
                 continue
 
@@ -3646,7 +3651,8 @@ class FreesurferWhiteMatterMaskGenerator(ScriptGenerator):
                     continue
             
             #check to see if the freesurfer outputs exist
-            fs_dir = self.setup.dataset_derivs/(sub)/(ses)/("freesurfer{}{}".format(acq, run))
+            _,_,anat_acq,anat_run = self.get_BIDS_fields_t1(t1)
+            fs_dir = self.setup.dataset_derivs/(sub)/(ses)/("freesurfer{}{}".format(anat_acq, anat_run))
             if not check_freesurfer_outputs(fs_dir):
                 self.add_to_missing(sub, ses, acq, run, 'freesurfer')
                 continue
@@ -3955,6 +3961,7 @@ def check_freesurfer_outputs(fs_dir):
                 #isDone = True
         #if isDone:
         #    continue
+    print("Error: Freesurfer outputs are not valid for {}".format(fs_dir))
     return False
 
 def hash_file(filepath):
