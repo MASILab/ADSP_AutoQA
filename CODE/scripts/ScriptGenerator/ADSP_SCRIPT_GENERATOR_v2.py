@@ -115,7 +115,8 @@ class ScriptGeneratorSetup:
             "FrancoisSpecial": FrancoisSpecialGenerator,
             "DWI_plus_Tractseg": DWI_plus_TractsegGenerator,
             "BedpostX_plus_Tractseg": BedpostX_plus_DWI_plus_TractsegGenerator,
-            "freewater": FreewaterGenerator
+            "freewater": FreewaterGenerator,
+            "FreesurferWhiteMatterMask": FreesurferWhiteMatterMaskGenerator
 
             ##TODO: add the other pipelines
 
@@ -222,14 +223,19 @@ class ScriptGeneratorSetup:
 
         If there is not a singularity image file for the pipeline, then it will return None.
         """
+        freesurfer_simg = '/nobackup/p_masi/Singularities/freesurfer_7.2.0.sif'
+        ticv_simg = '/nobackup/p_masi/Singularities/nssSLANT_v1.2.simg'
+        wmatlas_simg = '/nobackup/p_masi/Singularities/WMAtlas_v1.3.simg'
+        scilpy_simg = '/nobackup/p_masi/Singularities/scilus_1.5.0.sif'
+        tractseg_simg = '/nobackup/p_masi/Singularities/tractsegv2.simg'
         try:
-            mapping = {'SLANT-TICV': '/nobackup/p_masi/Singularities/nssSLANT_v1.2.simg',
+            mapping = {'SLANT-TICV': ticv_simg,
                         'PreQual': '/nobackup/p_masi/Singularities/PreQual_v1.0.8.simg',
-                        'freesurfer': '/nobackup/p_masi/Singularities/freesurfer_7.2.0.sif',
-                        'EVE3WMAtlas': '/nobackup/p_masi/Singularities/WMAtlas_v1.3.simg',
-                        'MNI152WMAtlas': '/nobackup/p_masi/Singularities/WMAtlas_v1.3.simg',
+                        'freesurfer': freesurfer_simg,
+                        'EVE3WMAtlas': wmatlas_simg,
+                        'MNI152WMAtlas': wmatlas_simg,
                         'UNest': '/nobackup/p_masi/Singularities/UNest.sif',
-                        'tractseg': ["/nobackup/p_masi/Singularities/tractsegv2.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif"] if not self.args.tractseg_make_DTI else ["/nobackup/p_masi/Singularities/tractsegv2.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif", "/nobackup/p_masi/Singularities/WMAtlas_v1.3.simg"],
+                        'tractseg': [tractseg_simg, scilpy_simg] if not self.args.tractseg_make_DTI else [tractseg_simg, scilpy_simg, wmatlas_simg],
                         'MaCRUISE': "/nobackup/p_masi/Singularities/macruise_classern_v3.2.0.simg",
                         'FrancoisSpecial': '/nobackup/p_masi/Singularities/singularity_francois_special_v1.sif',
                         'ConnectomeSpecial': '/nobackup/p_masi/Singularities/ConnectomeSpecial_v1.3.sif',
@@ -237,8 +243,9 @@ class ScriptGeneratorSetup:
                         'NODDI': '/nobackup/p_masi/Singularities/tractoflow_2.2.1_b9a527_2021-04-13.sif',
                         'freewater': '/nobackup/p_masi/Singularities/FreeWaterEliminationv2.sif',
                         'synthstrip': '/nobackup/p_masi/Singularities/synthstrip.1.5.sif',
-                        'DWI_plus_Tractseg': ["/nobackup/p_masi/Singularities/tractsegv2.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif", "/nobackup/p_masi/Singularities/WMAtlas_v1.3.simg"],
-                        'BedpostX_plus_Tractseg': ["/nobackup/p_masi/Singularities/tractsegv2.simg", "/nobackup/p_masi/Singularities/scilus_1.5.0.sif", "/nobackup/p_masi/Singularities/WMAtlas_v1.3.simg"]
+                        'DWI_plus_Tractseg': [tractseg_simg, scilpy_simg, wmatlas_simg],
+                        'BedpostX_plus_Tractseg': [tractseg_simg, scilpy_simg, wmatlas_simg],
+                        'FreesurferWhiteMatterMaskGenerator': '/nobackup/p_masi/Singularities/FreesurferWhiteMatterMask.simg'#[freesurfer_simg, wmatlas_simg]
                     }
             simg = mapping[self.args.pipeline]
         except:
@@ -496,6 +503,13 @@ class ScriptGenerator:
         pass
         #raise NotImplementedError("Error: bedpostx_plus_dwi_plus_tractseg_script_generate not implemented")
 
+    def freesurfer_white_matter_mask_script_generate(self):
+        """
+        Abstract method to be implemented by the child class
+        """
+        pass
+        #raise NotImplementedError("Error: freesurfer_white_matter_mask_script_generate not implemented")
+
     ## END ABSTRACT CLASSES ##
 
     def __init__(self, setup_object):
@@ -527,7 +541,8 @@ class ScriptGenerator:
             'NODDI': self.noddi_script_generate,
             'freewater': self.freewater_script_generate,
             "DWI_plus_Tractseg": self.dwi_plus_tractseg_script_generate,
-            "BedpostX_plus_Tractseg": self.bedpostx_plus_dwi_plus_tractseg_script_generate
+            "BedpostX_plus_Tractseg": self.bedpostx_plus_dwi_plus_tractseg_script_generate,
+            "FreesurferWhiteMatterMask": self.freesurfer_white_matter_mask_script_generate
         }
 
         self.necessary_outputs = {
@@ -584,7 +599,8 @@ class ScriptGenerator:
             'FrancoisSpecial': [],
             'DWI_plus_Tractseg': [],
             'BedpostX_plus_Tractseg': [],
-            'freesurfer': []
+            'freesurfer': [],
+            'FreesurferWhiteMatterMask': []
             ### TODO: add the necessary outputs for the other pipelines
                 #this cannot be static for all the outputs for all pipelines, only some of them
         }
@@ -743,7 +759,8 @@ class ScriptGenerator:
         """
         if ((WMAtlas_dir/("dwmri%diffusionmetrics.csv")).exists() and (WMAtlas_dir/("dwmri%ANTS_t1tob0.txt")).exists() and
                     (WMAtlas_dir/("dwmri%0GenericAffine.mat")).exists() and (WMAtlas_dir/("dwmri%1InverseWarp.nii.gz")).exists() and
-                    (WMAtlas_dir/("dwmri%Atlas_JHU_MNI_SS_WMPM_Type-III.nii.gz")).exists()):
+                    (WMAtlas_dir/("dwmri%Atlas_JHU_MNI_SS_WMPM_Type-III.nii.gz")).exists() and (WMAtlas_dir/("dwmri%fa.nii.gz")).exists() and
+                    (WMAtlas_dir/("dwmri%md.nii.gz")).exists() and (WMAtlas_dir/("dwmri%rd.nii.gz")).exists() and (WMAtlas_dir/("dwmri%ad.nii.gz")).exists()):
             return True
         return False
 
@@ -909,29 +926,41 @@ class ScriptGenerator:
         print("Using {} for {}_{}".format(t1s[0], sub, ses))
         return t1s[0]
 
-    def get_prov_t1(self, dir):
+    def get_prov_t1(self, dir, EVE3=False):
         """
         Given a processing directory, get the T1 that was used as input
 
         Otherwise, return None
         """
+        obtained_t1=True
         prov_file = dir/"pipeline_config.yml"
         if not prov_file.exists():
-            return None
-        
-        with open(prov_file, 'r') as file:
-            prov = yaml.safe_load(file)
-        
-        if 'inputs' not in prov:
-            return None
-        
-        if 't1' in prov['inputs']:
-            #return the T1, also check to see if it was a special copy
-            t1_prov = prov['inputs']['t1']
-            if type(t1_prov) == dict:
-                return t1_prov['src_path']
-            return t1_prov
-        return None
+            #return None
+            obtained_t1=False
+        else:
+            with open(prov_file, 'r') as file:
+                prov = yaml.safe_load(file)
+            
+            if 'inputs' not in prov:
+                #return None
+                obtained_t1=False
+            else:
+                if 't1' in prov['inputs']:
+                    #return the T1, also check to see if it was a special copy
+                    t1_prov = prov['inputs']['t1']
+                    if type(t1_prov) == dict:
+                        return t1_prov['src_path']
+                    return t1_prov
+                else:
+                    #return None
+                    obtained_t1=False
+        if not obtained_t1:
+            #check the EVE3 registration directory instead
+            EVE3_dir = dir.parent / ("WMAtlasEVE3{}".format(dir.name.split('WMAtlasEVE3')[1]))
+            if not EVE3:
+                return self.get_prov_t1(EVE3_dir, EVE3=True)
+            else:
+                return None
     
     def legacy_get_dwis(self, sub, ses, acq, run):
         """
@@ -3567,6 +3596,17 @@ class FreesurferWhiteMatterMaskGenerator(ScriptGenerator):
         self.outputs = {}
         self.inputs_dict = {}
 
+    def freesurfer_whitematter_mask_script_generate(self, script, session_input, session_output, **kwargs):
+        """
+        Creates a single script for running freesurfer white matter mask DTI metrics
+        """
+
+        extra_args = "/PYTHON3/get_fs_global_wm_metrics.py /INPUTS wmparc.mgz rawavg.mgz dwmri%ANTS_t1tob0.txt dwmri%fa.nii.gz dwmri%md.nii.gz dwmri%ad.nii.gz dwmri%rd.nii.gz mask.nii.gz aseg.stats /OUTPUTS --freesurfer_license_path /usr/local/freesurfer/.license"
+
+        script.write("echo Running Freesurfer White Matter Mask Metic Calculation...\n")
+        script.write("singularity exec -e --contain -B /tmp:/tmp -B {}:/INPUTS -B {}:/OUTPUTS -B {}:/usr/local/freesurfer/.license {} {}\n".format(session_input, session_output, self.setup.freesurfer_license_path, self.setup.simg, extra_args))
+        script.write("echo Done running Freesurfer White Matter Mask Metric Calculation. Now deleting inputs and copying back outputs...\n")
+
     def generate_freesurfer_whitematter_mask_scripts(self):
         """
         Creates scripts for running freesurfer white matter mask DTI metrics
@@ -3595,7 +3635,7 @@ class FreesurferWhiteMatterMaskGenerator(ScriptGenerator):
                 self.add_to_missing(sub, ses, acq, run, 'EVE3WMAtlas')
                 continue
 
-            #get the T1 that was used for PreQual. If we cannot get it, then select it again using the function
+            #get the T1 that was used for PreQual/EVE3. If we cannot get it, then select it again using the function
             t1 = self.get_prov_t1(prequal_dir)
             if not t1:
                 #get the T1 using the function, and print out a provenance warning
@@ -3613,7 +3653,37 @@ class FreesurferWhiteMatterMaskGenerator(ScriptGenerator):
 
             #now that we have all the necessary inputs, we can start the script generation TODO
 
-            ####### TODO
+            self.count += 1
+
+            #create the input and output directories
+            (session_input, session_output) = self.make_session_dirs(sub, ses, acq, run, tmp_input_dir=self.setup.tmp_input_dir,
+                                            tmp_output_dir=self.setup.tmp_output_dir)
+
+            #create the target output directory
+            if not wmmask_outdir.exists():
+                os.makedirs(wmmask_outdir)
+
+            #setup the inputs dictionary
+                #will need to alter if we do not have EVE3 run (i.e. may need to generate on the fly maps/registrations)
+            self.inputs_dict[self.count] = {
+            #may need to have a flag here for if we are not using the PreQual mask
+                #'pq_dwi_dir': {'src_path': prequal_dir/'PREPROCESSED', 'targ_name': '', 'directory': True}, #need PreQual for the mask
+                'pq_mask': prequal_dir/'PREPROCESSED'/'mask.nii.gz',
+            #here is where we would add the flag for if we are generating our own maps and registrations
+                'fa_map': eve3_dir/'dwmri%fa.nii.gz',
+                'md_map': eve3_dir/'dwmri%md.nii.gz',
+                'ad_map': eve3_dir/'dwmri%ad.nii.gz',
+                'rd_map': eve3_dir/'dwmri%rd.nii.gz',
+                't1b0_registration': eve3_dir/'dwmri%ANTS_t1tob0.txt',
+            #freesurfer outputs (which we NEED to have)
+                'wmparc': fs_dir/'freesurfer'/'mri'/'wmparc.mgz',
+                'rawavg': fs_dir/'freesurfer'/'mri'/'rawavg.mgz',
+                'aseg.stats': fs_dir/'freesurfer'/'stats'/'aseg.stats'
+            }
+            self.outputs[self.count] = []
+
+            #now we can start the script generation
+            self.start_script_generation(session_input, session_output, deriv_output_dir=wmmask_outdir)
 
 #for Kurt: run scilpy scipts on tractseg dirs
 class Scilpy_on_TractsegGenerator(ScriptGenerator):
