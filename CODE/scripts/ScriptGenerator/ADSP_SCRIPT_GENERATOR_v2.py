@@ -3955,12 +3955,16 @@ def check_freesurfer_outputs(fs_dir):
         #now check the contents of the reconlog
         isDone = True
         with open(recon_log, 'r') as log:
-            content = log.read()
-            if 'finished without error' in content:
-                return True
-                #isDone = True
-        #if isDone:
-        #    continue
+            try:
+                content = log.read()
+                if 'finished without error' in content:
+                    return True
+                    #isDone = True
+            #if isDone:
+            #    continue
+            except:
+                print("Error: Could not read contents of recon-all.log for {}".format(fs_dir))
+                return False
     print("Error: Freesurfer outputs are not valid for {}".format(fs_dir))
     return False
 
