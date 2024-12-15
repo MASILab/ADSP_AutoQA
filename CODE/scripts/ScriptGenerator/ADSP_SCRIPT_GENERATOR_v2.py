@@ -1486,7 +1486,7 @@ class PreQualGenerator(ScriptGenerator):
         if self.setup.args.dataset_name == "HCPA" or self.setup.args.dataset_name == "HCPD" or self.setup.args.dataset_name == "HCP":
             #we want to turn off all PREPROCESSING steps possible
             opts = '--denoise off --synb0 off'
-        elif self.setup.args.dataset_name == "OASIS3" or self.setup.args.dataset_name == "IBIS":
+        elif self.setup.args.dataset_name == "OASIS3" or self.setup.args.dataset_name == "IBIS" or self.setup.args.dataset_name == "TempleSocial":
             #we need the threshold for bvalues (as this is the weird bvalue acquisition)
             opts = '--bval_threshold 51 --eddy_bval_scale 2 --topup_first_b0s_only'
         elif self.setup.args.dataset_name == "Humphreys":
