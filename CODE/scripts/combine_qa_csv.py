@@ -114,6 +114,9 @@ for r in res:
     for c in cols:
         if c not in ['sub', 'ses', 'acq', 'run']:
             df.rename(columns={c: '{}_{}'.format(proc_name, c)}, inplace=True)
+    #all the columns should be object type, so that we can merge them
+    for c in df.columns:
+        df[c] = df[c].astype('object')
     dfs.append(df)
 
 #combine the dataframes
