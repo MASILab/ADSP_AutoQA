@@ -1486,9 +1486,11 @@ class PreQualGenerator(ScriptGenerator):
         if self.setup.args.dataset_name == "HCPA" or self.setup.args.dataset_name == "HCPD" or self.setup.args.dataset_name == "HCP":
             #we want to turn off all PREPROCESSING steps possible
             opts = '--denoise off --synb0 off'
-        elif self.setup.args.dataset_name == "OASIS3" or self.setup.args.dataset_name == "IBIS" or self.setup.args.dataset_name == "TempleSocial":
+        elif self.setup.args.dataset_name == "OASIS3" or self.setup.args.dataset_name == "IBIS":
             #we need the threshold for bvalues (as this is the weird bvalue acquisition)
             opts = '--bval_threshold 51 --eddy_bval_scale 2 --topup_first_b0s_only'
+        elif self.setup.args.dataset_name == "TempleSocial":
+            opts = '--nonzero_shells 250,1000,2000,3250,5000 --topup_first_b0s_only'
         elif self.setup.args.dataset_name == "Humphreys":
             opts = '--topup_first_b0s_only --eddy_bval_scale 4'
         else:
@@ -2200,7 +2202,7 @@ class EVE3WMAtlasGenerator(ScriptGenerator):
                 seg = self.get_TICV_seg_file(t1, ses_deriv)
             else:
                 seg = self.get_UNest_seg_file(t1, ses_deriv)
-            if not seg.exists():
+            if not seg or not seg.exists():
                 self.add_to_missing(sub, ses, acq, run, 'TICV' if not self.setup.args.use_unest_seg else 'UNest')
                 continue
 
