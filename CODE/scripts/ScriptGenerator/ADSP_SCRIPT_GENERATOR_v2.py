@@ -72,6 +72,7 @@ def pa():
     p.add_argument('--tractseg_make_DTI', action='store_true', help="If you want to make the DTI files for Tractseg")
     p.add_argument('--tractseg_DTI_use_all_shells', action='store_true', help="If you want to forego the shelling for calculating DTI measures")
     p.add_argument('--select_sessions_list', type=str, default='', help="If you want to run only a subset of scans/sessions, provide a path to a list of sessions directories to run FOR THAT SPECIFIC PIPELINE. (e.g. for TICV, provide a list of T1s, for PreQual provide a list of dwi dirs, for EVE3 provide a list of PreQual directories, etc.)")
+    p.add_argument('--infant_csv', type=str, default='', help="Path to the demographics csv file that is required as input for the infantFS pipeline")
     return p.parse_args()
 
 class ScriptGeneratorSetup:
@@ -116,7 +117,9 @@ class ScriptGeneratorSetup:
             "DWI_plus_Tractseg": DWI_plus_TractsegGenerator,
             "BedpostX_plus_Tractseg": BedpostX_plus_DWI_plus_TractsegGenerator,
             "freewater": FreewaterGenerator,
-            "FreesurferWhiteMatterMask": FreesurferWhiteMatterMaskGenerator
+            "FreesurferWhiteMatterMask": FreesurferWhiteMatterMaskGenerator,
+            "rawEVE3WMAtlas": RawEVE3WMAtlasGenerator,
+            "infantFS": InfantFreesurferGenerator
 
             ##TODO: add the other pipelines
 
@@ -245,7 +248,9 @@ class ScriptGeneratorSetup:
                         'synthstrip': '/nobackup/p_masi/Singularities/synthstrip.1.5.sif',
                         'DWI_plus_Tractseg': [tractseg_simg, scilpy_simg, wmatlas_simg],
                         'BedpostX_plus_Tractseg': [tractseg_simg, scilpy_simg, wmatlas_simg],
-                        'FreesurferWhiteMatterMaskGenerator': '/nobackup/p_masi/Singularities/FreesurferWhiteMatterMask.simg'#[freesurfer_simg, wmatlas_simg]
+                        'FreesurferWhiteMatterMaskGenerator': '/nobackup/p_masi/Singularities/FreesurferWhiteMatterMask.simg',#[freesurfer_simg, wmatlas_simg]
+                        'rawEVE3WMAtlas': wmatlas_simg,
+                        "infantFS" : "/nobackup/p_masi/Singularities/infantfs_v0.0.sif",
                     }
             simg = mapping[self.args.pipeline]
         except:
@@ -510,6 +515,20 @@ class ScriptGenerator:
         pass
         #raise NotImplementedError("Error: freesurfer_white_matter_mask_script_generate not implemented")
 
+    def rawEVE3Registration_script_generate(self):
+        """
+        Abstract method to be implemented by the child class
+        """
+        pass
+        #raise NotImplementedError("Error: EVE3Registration_script_generate not implemented")
+    
+    def infant_freesurfer_script_generate(self):
+        """
+        Abstract method to be implemented by the child class
+        """
+        pass
+        #raise NotImplementedError("Error: infant_freesurfer_script_generate not implemented")
+
     ## END ABSTRACT CLASSES ##
 
     def __init__(self, setup_object):
@@ -542,7 +561,9 @@ class ScriptGenerator:
             'freewater': self.freewater_script_generate,
             "DWI_plus_Tractseg": self.dwi_plus_tractseg_script_generate,
             "BedpostX_plus_Tractseg": self.bedpostx_plus_dwi_plus_tractseg_script_generate,
-            "FreesurferWhiteMatterMask": self.freesurfer_white_matter_mask_script_generate
+            "FreesurferWhiteMatterMask": self.freesurfer_white_matter_mask_script_generate,
+            "rawEVE3WMAtlas": self.rawEVE3Registration_script_generate,
+            "infantFS": self.infant_freesurfer_script_generate
         }
 
         self.necessary_outputs = {
@@ -600,7 +621,9 @@ class ScriptGenerator:
             'DWI_plus_Tractseg': [],
             'BedpostX_plus_Tractseg': [],
             'freesurfer': [],
-            'FreesurferWhiteMatterMask': []
+            'FreesurferWhiteMatterMask': [],
+            'rawEVE3WMAtlas': [],
+            'infantFS': []
             ### TODO: add the necessary outputs for the other pipelines
                 #this cannot be static for all the outputs for all pipelines, only some of them
         }
@@ -623,6 +646,15 @@ class ScriptGenerator:
             files = [x.strip() for x in files]
 
         return files
+
+    def get_sub_ses_t1s(self, sub, ses):
+        """
+        Given a root dataset path, subject, and session, returns a list of T1 paths
+        """
+        root = self.setup.root_dataset_path
+        sesdir = root/sub/ses/'anat'
+        t1s = list(sesdir.glob('*T1w.nii.gz'))
+        return t1s
 
 
     def find_dwis(self):
@@ -822,6 +854,29 @@ class ScriptGenerator:
                 return False
         return True
 
+    def has_infantFS_outputs(self, infant_fs_dir):
+        """
+        Given the path to an infant FS directory, returns True if the outputs exist, False otherwise
+        """
+        filenames = [
+            "./lh.dwhite.ribbon.mgz",
+            "./aseg.nii.gz",
+            "./aparc+aseg.mgz",
+            "./lh.ribbon.mgz",
+            "./norm.nii.gz",
+            "./rh.ribbon.mgz",
+            "./wm.mgz",
+            "./brain.finalsurfs.mgz",
+            "./lh.dpial.ribbon.mgz",
+            "./rh.dpial.ribbon.mgz",
+            "./norm.mgz",
+            "./rh.dwhite.ribbon.mgz",
+            "./aseg.count.txt",
+            "./aseg.mgz",
+            "./ribbon.mgz"
+        ]
+        files = [infant_fs_dir/'mri'/f for f in filenames]
+        return all([f.exists() for f in files])
 
     def is_missing_DTI_tractseg(self, tsdir):
         """
@@ -2624,8 +2679,8 @@ class ConnectomeSpecialGenerator(ScriptGenerator):
                 self.inputs_dict[self.count]['seg'] = {'src_path': seg, 'targ_name': '{}/{}'.format(seg_post_final, seg.name)}
 
             #now write the script
-                pq_input = session_input/"PreQual"
-                seg_input = session_input/"Slant"
+            pq_input = session_input/"PreQual"
+            seg_input = session_input/"Slant"
             self.start_script_generation(session_input, session_output, deriv_output_dir=cs_target,
                                          input_dirs=[seg_pre_dir, seg_post_final, scalars_dir, preproc_dir],
                                          PQ_inp=pq_input, seg_input=seg_input)
@@ -3693,6 +3748,214 @@ class FreesurferWhiteMatterMaskGenerator(ScriptGenerator):
             #now we can start the script generation
             self.start_script_generation(session_input, session_output, deriv_output_dir=wmmask_outdir)
 
+#for datasets that do not have PreQual run but are preprocessed: WMAtlas from raw dwi
+class RawEVE3WMAtlasGenerator(ScriptGenerator):
+    """
+    Class for generating EVE3 registration scripts from DWI not in PQ directory
+    """
+
+    def __init__(self, setup_object):
+        super().__init__(setup_object=setup_object)
+
+        #self.warnings = {}
+        self.outputs = {}
+        self.inputs_dict = {}
+
+        self.generate_rawEVE3WMAtlas_scripts()
+
+    def rawEVE3Registration_script_generate(self, script, session_input, session_output, **kwargs):
+        """
+        Writes the command for running EVE3 registration to a script
+        """
+
+        script.write("echo Getting mask for DWI...\n")
+        script.write("echo Extracting b0...\n")
+        b0 = "{}/dwmri_b0.nii.gz".format(session_input)
+        script.write("time singularity exec -e --contain -B /tmp:/tmp -B {}:{} {} bash -c \"dwiextract {}/dwmri.nii.gz -fslgrad {}/dwmri.bvec {}/dwmri.bval - -bzero | mrmath - mean {} -axis 3\"\n".format(session_input, session_input, self.setup.simg, session_input, session_input, session_input, b0))
+        script.write("echo Creating mask...\n")
+        mask = "{}/mask.nii.gz".format(session_input)
+        #script.write("cp {}/mask.nii.gz {}\n".format(kwargs['temp_dir'], mask))
+        script.write("time singularity exec -e --contain -B /tmp:/tmp -B {}:{} {} bet {} {} -f 0.25 -m -n -R\n".format(session_input, session_input, session_input, b0, mask))
+
+        script.write("echo Running EVE3 registration...\n")
+        script.write("singularity run -e --contain -B /tmp:/tmp -B {}:/INPUTS -B {}:/OUTPUTS {} --EVE3\n".format(session_input, session_output, self.setup.simg))
+        script.write("echo Finished running EVE3 registration. Now removing inputs and copying outputs back...\n")
+
+        #always remove firstshell to save space
+        script.write("rm {}\n".format(str(session_output/'dwmri%firstshell.nii.gz')))
+        #remove the warped files as well (result of using ANTs)
+        script.write("rm {}\n".format(str(session_output/'dwmri%InverseWarped.nii.gz')))
+        script.write("rm {}\n".format(str(session_output/'dwmri%Warped.nii.gz')))
+
+
+        #add a check to see if dwmri and dwmri%firstshell are the same. Delete if they are
+
+    def generate_rawEVE3WMAtlas_scripts(self):
+        """
+        Generates EVE3 scripts
+        """
+
+        dwi_niis = self.find_dwis()
+        
+        for dwi_nii_p in tqdm(dwi_niis):
+            dwi_nii = Path(dwi_nii_p)
+            #get the BIDS tags
+            sub, ses, acq, run = self.get_BIDS_fields_dwi(dwi_nii)
+
+            #make sure the bval and bvec files exist
+            bval = Path(dwi_nii_p.replace('dwi.nii.gz', 'dwi.bval'))
+            bvec = Path(dwi_nii_p.replace('dwi.nii.gz', 'dwi.bvec'))
+            if not bval.exists():
+                self.add_to_missing(sub, ses, acq, run, 'bval_missing')
+                continue
+            if not bvec.exists():
+                self.add_to_missing(sub, ses, acq, run, 'bvec_missing')
+                continue
+
+            #check to see if the EVE3 outputs already exist
+            eve3dir = self.setup.output_dir/(sub)/(ses)/("WMAtlasEVE3{}{}".format(acq, run))
+            
+            if self.has_EVE3WMAtlas_outputs(eve3dir):
+                continue
+
+            #get the T1 that was used for PreQual. If we cannot get it, then select it again using the function
+            #t1 = self.get_prov_t1(self.setup.output_dir/(sub)/(ses)/("PreQual{}{}".format(acq, run)))
+            #if not t1:
+                #get the T1 using the function, and print out a provenance warning
+                #print("Warning: Could not get provenance T1 for {}".format(pqdir))
+            t1 = self.get_t1(self.setup.root_dataset_path/(sub)/(ses)/("anat"), sub, ses)
+            if not t1:
+                self.add_to_missing(sub, ses, acq, run, 'T1')
+                continue
+            
+            #based on the T1, get the TICV/UNest segmentation
+            ses_deriv = self.setup.dataset_derivs/(sub)/(ses)
+            if not self.setup.args.use_unest_seg:
+                seg = self.get_TICV_seg_file(t1, ses_deriv)
+            else:
+                seg = self.get_UNest_seg_file(t1, ses_deriv)
+            if not seg or not seg.exists():
+                self.add_to_missing(sub, ses, acq, run, 'TICV' if not self.setup.args.use_unest_seg else 'UNest')
+                continue
+
+            self.count += 1
+
+            #setup the temp directories
+            (session_input, session_output) = self.make_session_dirs(sub, ses, acq, run, tmp_input_dir=self.setup.tmp_input_dir,
+                                            tmp_output_dir=self.setup.tmp_output_dir)
+
+            #create the output target directory
+            eve3_target = self.setup.output_dir/(sub)/(ses)/("WMAtlasEVE3{}{}".format(acq, run))
+            if not eve3_target.exists():
+                os.makedirs(eve3_target)
+
+            #setup the inputs dictionary and outputs list            
+            self.inputs_dict[self.count] = {'t1': {'src_path': t1, 'targ_name': 't1.nii.gz'},
+                                            'seg': {'src_path': seg, 'targ_name': 'T1_seg.nii.gz'},
+                                            'dwi': {'src_path': dwi_nii, 'targ_name': 'dwmri.nii.gz'},
+                                            'bval': {'src_path': bval, 'targ_name': 'dwmri.bval'},
+                                            'bvec': {'src_path': bvec, 'targ_name': 'dwmri.bvec'}
+                                        }
+            self.outputs[self.count] = []
+
+            #start the script generation
+            self.start_script_generation(session_input, session_output, deriv_output_dir=eve3_target)
+
+#infant freesurfer
+class InfantFreesurferGenerator(ScriptGenerator):
+
+    def __init__(self, setup_object):
+        """
+        Class for running infant freesurfer
+        """
+        super().__init__(setup_object=setup_object)
+        #self.warnings = {}
+        self.outputs = {}
+        self.inputs_dict = {}
+
+        self.generate_infant_freesurfer_scripts()
+
+    def infant_freesurfer_script_generate(self, script, session_input, session_output, **kwargs):
+        """
+        Writes a single script for running infant freesurfer
+        """
+
+        script.write("echo Running Infant Freesurfer...\n")
+        script.write("singularity exec -e --contain -B /tmp:/tmp -B {}:/usr/local/freesurfer/.license -B {}:{}/freesurfer -B {}:{} -B {}/mprage.nii.gz:{}/freesurfer/mprage.nii.gz {} bash -c \"export SUBJECTS_DIR={}; infant_recon_all --s freesurfer --outdir {} --age {}\"\n".format(self.setup.freesurfer_license_path, session_input, session_input, session_output, session_output, session_input, session_input, self.setup.simg, session_input, session_output, kwargs['age']))
+        
+        script.write("Removing the working directory...\n")
+        script.write("rm -r {}/'work'\n".format(session_output))
+        
+        script.write("echo Done running Infant Freesurfer. Now removing inputs and copying outputs back...\n")
+        
+    
+    def generate_infant_freesurfer_scripts(self):
+        """
+        Generates infant freesurfer scripts for a dataset
+        """
+
+        #first, make sure that the freesurfer license is provided
+        assert self.setup.freesurfer_license_path.exists(), "Error: Freesurfer license file does not exist at {}".format(self.setup.freesurfer_license_path)
+
+        #check to make sure that the CSV is provided
+        demogs_csv = Path(self.setup.args.infant_csv)
+        assert demogs_csv.exists(), "Error: Infant CSV file does not exist at {}".format(demogs_csv)
+
+        #iterate through the rows of the CSV
+        demog_df = pd.read_csv(demogs_csv)
+        for index, row in tqdm(demog_df.iterrows()):
+            #get the subject, age, and session (if it exists)
+            sub = row['subject']
+            age = row['age']
+            ses = row['session'] if 'session' in row else None
+
+            #if age or subject is missing, skip and add to the missing list
+            if not sub or not age:
+                self.add_to_missing(sub, ses, '', '', 'missing_subject_or_age')
+                continue
+                #check to see if the age is greater than 2
+            age = age * 12 #should be age in months
+            #round the age to the nearest month
+            age = round(age)
+            if age > 24: #if the scan is for a child over 2 years old, skip
+                self.add_to_missing(sub, ses, '', '', 'age_over_2')
+                print("ERROR: Age over 2 for {}/{}".format(sub, ses))
+                continue
+
+            #get the list of T1s for the subject/session
+            dataset_root = self.setup.root_dataset_path
+            t1s = self.get_sub_ses_t1s(sub, ses)
+
+            for t1 in t1s:
+                #get the BIDS tags for the T1
+                subx, sesx, acq, run = self.get_BIDS_fields_t1(t1)
+                assert sub == subx and ses == sesx, "Error: Subject/Ses mismatch between CSV and T1s"
+                
+                #check to see if the outputs already exist
+                infant_fs_dir = self.setup.dataset_derivs/(sub)/(ses)/("infantFS{}{}".format(acq, run))
+                if self.has_infantFS_outputs(infant_fs_dir):
+                    continue
+
+                #now we can create the script
+                self.count += 1
+
+                #create the input and output directories
+                (session_input, session_output) = self.make_session_dirs(sub, ses, acq, run, tmp_input_dir=self.setup.tmp_input_dir,
+                                                tmp_output_dir=self.setup.tmp_output_dir)
+                
+                #create the target output directory
+                infant_fs_target = self.setup.output_dir/(sub)/(ses)/("infantFS{}{}".format(acq, run))
+                if not infant_fs_target.exists():
+                    os.makedirs(infant_fs_target)
+                
+                #setup the inputs dictionary and outputs list
+                self.inputs_dict[self.count] = {'t1': {'src_path': t1, 'targ_name': 'mprage.nii.gz'}}
+                self.outputs[self.count] = []
+
+                #start the script generation
+                self.start_script_generation(session_input, session_output, deriv_output_dir=infant_fs_target, age=age)
+
+
 #for Kurt: run scilpy scipts on tractseg dirs
 class Scilpy_on_TractsegGenerator(ScriptGenerator):
 
@@ -3897,7 +4160,6 @@ def get_shells_and_dirs(PQdir, bval_files, bvec_files):
         return None, dti_set, None, None
     return rounded_bvals, '"' + " ".join(['0']+[str(int(x)) for x in sorted(dti_set)]) + '"', '"' + " ".join(['0']+[str(int(x)) for x in sorted(fod_set)]) + '"', '"' + " ".join(['0']+[str(int(x)) for x in sorted(sh8_set)]) + '"'
         
-
 
 def get_num_shells(bval):
     """
