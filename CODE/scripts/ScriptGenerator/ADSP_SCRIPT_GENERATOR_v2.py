@@ -3775,7 +3775,7 @@ class RawEVE3WMAtlasGenerator(ScriptGenerator):
         script.write("echo Creating mask...\n")
         mask = "{}/mask.nii.gz".format(session_input)
         #script.write("cp {}/mask.nii.gz {}\n".format(kwargs['temp_dir'], mask))
-        script.write("time singularity exec -e --contain -B /tmp:/tmp -B {}:{} {} bet {} {} -f 0.25 -m -n -R\n".format(session_input, session_input, session_input, b0, mask))
+        script.write("time singularity exec -e --contain -B /tmp:/tmp -B {}:{} {} bet {} {} -f 0.25 -m -n -R\n".format(session_input, session_input, self.setup.simg, b0, mask))
 
         script.write("echo Running EVE3 registration...\n")
         script.write("singularity run -e --contain -B /tmp:/tmp -B {}:/INPUTS -B {}:/OUTPUTS {} --EVE3\n".format(session_input, session_output, self.setup.simg))
