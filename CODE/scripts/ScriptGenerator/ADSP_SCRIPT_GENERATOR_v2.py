@@ -73,6 +73,7 @@ def pa():
     p.add_argument('--tractseg_DTI_use_all_shells', action='store_true', help="If you want to forego the shelling for calculating DTI measures")
     p.add_argument('--select_sessions_list', type=str, default='', help="If you want to run only a subset of scans/sessions, provide a path to a list of sessions directories to run FOR THAT SPECIFIC PIPELINE. (e.g. for TICV, provide a list of T1s, for PreQual provide a list of dwi dirs, for EVE3 provide a list of PreQual directories, etc.)")
     p.add_argument('--infant_csv', type=str, default='', help="Path to the demographics csv file that is required as input for the infantFS pipeline")
+    p.add_argument('--bedpost_use_pq', action='store_true', help="If you want to use the PreQual outputs for BedpostX instead of the raw DWI")
     return p.parse_args()
 
 class ScriptGeneratorSetup:
@@ -2251,15 +2252,18 @@ class EVE3WMAtlasGenerator(ScriptGenerator):
                     self.add_to_missing(sub, ses, acq, run, 'T1')
                     continue
             
-            #based on the T1, get the TICV/UNest segmentation
-            ses_deriv = pqdir.parent
-            if not self.setup.args.use_unest_seg:
-                seg = self.get_TICV_seg_file(t1, ses_deriv)
+            #based on the T1, get the TICV/UNest segmentation (if applicable)
+            if self.setup.no_t1seg:
+                seg = None
             else:
-                seg = self.get_UNest_seg_file(t1, ses_deriv)
-            if not seg or not seg.exists():
-                self.add_to_missing(sub, ses, acq, run, 'TICV' if not self.setup.args.use_unest_seg else 'UNest')
-                continue
+                ses_deriv = pqdir.parent
+                if not self.setup.args.use_unest_seg:
+                    seg = self.get_TICV_seg_file(t1, ses_deriv)
+                else:
+                    seg = self.get_UNest_seg_file(t1, ses_deriv)
+                if not seg or not seg.exists():
+                    self.add_to_missing(sub, ses, acq, run, 'TICV' if not self.setup.args.use_unest_seg else 'UNest')
+                    continue
 
             self.count += 1
 
@@ -2274,9 +2278,11 @@ class EVE3WMAtlasGenerator(ScriptGenerator):
 
             #setup the inputs dictionary and outputs list            
             self.inputs_dict[self.count] = {'t1': {'src_path': t1, 'targ_name': 't1.nii.gz'},
-                                            'seg': {'src_path': seg, 'targ_name': 'T1_seg.nii.gz'},
                                             'pq_dwi_dir': {'src_path': pqdir/'PREPROCESSED', 'targ_name': '', 'directory': True}
                                         }
+            if not self.setup.no_t1seg:
+                self.inputs_dict[self.count]['seg'] = {'src_path': seg, 'targ_name': 'T1_seg.nii.gz'}
+                #'seg': {'src_path': seg, 'targ_name': 'T1_seg.nii.gz'},
             self.outputs[self.count] = []
 
             #start the script generation
@@ -3594,13 +3600,20 @@ class BedpostX_plus_DWI_plus_TractsegGenerator(ScriptGenerator):
             accre_home_directory = os.path.expanduser("~")   
 
         #get the raw dwi files
-        dwis = self.find_dwis()
+        if not self.setup.args.bedpost_use_pq:
+            dwis = self.find_dwis()
+        else:
+            dwis = self.get_PreQual_dirs()
 
         for dwi_p in tqdm(dwis):
             dwi = Path(dwi_p)
 
             #get the sub, ses, acq, run
-            sub, ses, acq, run = self.get_BIDS_fields_dwi(dwi)
+            if not self.setup.args.bedpost_use_pq:
+                sub, ses, acq, run = self.get_BIDS_fields_dwi(dwi)
+            else:
+                sub, ses, acq, run = self.get_BIDS_fields_from_PQdir(dwi)
+                dwi = Path(dwi)/"PREPROCESSED"/'dwmri.nii.gz'
 
             #check to see if the outputs exist already
                 #NOTE: this will only check the specified output directory, not the BIDS directory
@@ -3609,8 +3622,12 @@ class BedpostX_plus_DWI_plus_TractsegGenerator(ScriptGenerator):
                 continue
 
             #get the bval and bvec files for the dwis
-            bval = Path(dwi_p.replace('dwi.nii.gz', 'dwi.bval'))
-            bvec = Path(dwi_p.replace('dwi.nii.gz', 'dwi.bvec'))
+            if not self.setup.args.bedpost_use_pq:
+                bval = Path(dwi_p.replace('dwi.nii.gz', 'dwi.bval'))
+                bvec = Path(dwi_p.replace('dwi.nii.gz', 'dwi.bvec'))
+            else:
+                bval = Path(str(dwi).replace('dwmri.nii.gz', 'dwmri.bval'))
+                bvec = Path(str(dwi).replace('dwmri.nii.gz', 'dwmri.bvec'))
 
             #make sure that the bval and bvec and nii files exist
             assert dwi.exists() and bval.exists() and bvec.exists(), "Error: dwi, bval, or bvec file does not exist for {}".format(dwi)
