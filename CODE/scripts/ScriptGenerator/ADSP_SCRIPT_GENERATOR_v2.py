@@ -74,6 +74,7 @@ def pa():
     p.add_argument('--select_sessions_list', type=str, default='', help="If you want to run only a subset of scans/sessions, provide a path to a list of sessions directories to run FOR THAT SPECIFIC PIPELINE. (e.g. for TICV, provide a list of T1s, for PreQual provide a list of dwi dirs, for EVE3 provide a list of PreQual directories, etc.)")
     p.add_argument('--infant_csv', type=str, default='', help="Path to the demographics csv file that is required as input for the infantFS pipeline")
     p.add_argument('--bedpost_use_pq', action='store_true', help="If you want to use the PreQual outputs for BedpostX instead of the raw DWI")
+    p.add_argument('--no_t1seg', action='store_true', help="If you do not want to use a T1segmentation for EVE3 pipeline. (note that BET will be used instead)")
     return p.parse_args()
 
 class ScriptGeneratorSetup:
@@ -2253,7 +2254,7 @@ class EVE3WMAtlasGenerator(ScriptGenerator):
                     continue
             
             #based on the T1, get the TICV/UNest segmentation (if applicable)
-            if self.setup.no_t1seg:
+            if self.setup.args.no_t1seg:
                 seg = None
             else:
                 ses_deriv = pqdir.parent
@@ -2280,7 +2281,7 @@ class EVE3WMAtlasGenerator(ScriptGenerator):
             self.inputs_dict[self.count] = {'t1': {'src_path': t1, 'targ_name': 't1.nii.gz'},
                                             'pq_dwi_dir': {'src_path': pqdir/'PREPROCESSED', 'targ_name': '', 'directory': True}
                                         }
-            if not self.setup.no_t1seg:
+            if not self.setup.args.no_t1seg:
                 self.inputs_dict[self.count]['seg'] = {'src_path': seg, 'targ_name': 'T1_seg.nii.gz'}
                 #'seg': {'src_path': seg, 'targ_name': 'T1_seg.nii.gz'},
             self.outputs[self.count] = []
