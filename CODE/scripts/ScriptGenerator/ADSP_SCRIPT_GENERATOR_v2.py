@@ -75,6 +75,7 @@ def pa():
     p.add_argument('--infant_csv', type=str, default='', help="Path to the demographics csv file that is required as input for the infantFS pipeline")
     p.add_argument('--bedpost_use_pq', action='store_true', help="If you want to use the PreQual outputs for BedpostX instead of the raw DWI")
     p.add_argument('--no_t1seg', action='store_true', help="If you do not want to use a T1segmentation for EVE3 pipeline. (note that BET will be used instead)")
+    p.add_argument('--use_infant_fs', action='store_true', help="If you want to use the infantFS pipeline instead of the regular FreeSurfer pipeline for the FSWM mask")
     return p.parse_args()
 
 class ScriptGeneratorSetup:
@@ -3679,6 +3680,16 @@ class FreesurferWhiteMatterMaskGenerator(ScriptGenerator):
         Creates a single script for running freesurfer white matter mask DTI metrics
         """
 
+        #if using infant FS, make sure to combine the two stats files
+                #self.inputs_dict[self.count]['brainvol_stats'] = {'src_path': fs_dir/'stats'/'brainvol.stats', 'targ_name': 'brainvol.stats'}
+                #self.inputs_dict[self.count]['lh_aparc_stats'] = {'src_path': fs_dir/'stats'/'lh.aparc.stats', 'targ_name': 'lh.aparc.stats'}
+        if self.setup.args.use_infant_fs:
+            script.write("echo Combining stats files...\n")
+            brainvol_stats = "{}/brainvol.stats".format(session_input)
+            lh_aparc_stats = "{}/lh.aparc.stats".format(session_input)
+            script.write("cat {} > {}/aseg.stats\n".format(brainvol_stats, session_input))
+            script.write("cat {} | grep eTIV >> {}/aseg.stats\n".format(lh_aparc_stats, session_input))
+
         extra_args = "/PYTHON3/get_fs_global_wm_metrics.py /INPUTS wmparc.mgz rawavg.mgz dwmri%ANTS_t1tob0.txt dwmri%fa.nii.gz dwmri%md.nii.gz dwmri%ad.nii.gz dwmri%rd.nii.gz mask.nii.gz aseg.stats /OUTPUTS --freesurfer_license_path /usr/local/freesurfer/.license"
 
         script.write("echo Running Freesurfer White Matter Mask Metic Calculation...\n")
@@ -3727,10 +3738,17 @@ class FreesurferWhiteMatterMaskGenerator(ScriptGenerator):
             
             #check to see if the freesurfer outputs exist
             _,_,anat_acq,anat_run = self.get_BIDS_fields_t1(t1)
-            fs_dir = self.setup.dataset_derivs/(sub)/(ses)/("freesurfer{}{}".format(anat_acq, anat_run))
-            if not check_freesurfer_outputs(fs_dir):
-                self.add_to_missing(sub, ses, acq, run, 'freesurfer')
-                continue
+            #check to see if we are using infant freesurfer or not
+            if self.setup.args.use_infant_fs:
+                fs_dir = self.setup.dataset_derivs/(sub)/(ses)/("infantFS{}{}".format(anat_acq, anat_run))
+                if self.has_infantFS_outputs(fs_dir):
+                    self.add_to_missing(sub, ses, acq, run, 'infant_freesurfer')
+                    continue
+            else:
+                fs_dir = self.setup.dataset_derivs/(sub)/(ses)/("freesurfer{}{}".format(anat_acq, anat_run))
+                if not check_freesurfer_outputs(fs_dir):
+                    self.add_to_missing(sub, ses, acq, run, 'freesurfer')
+                    continue
 
             #now that we have all the necessary inputs, we can start the script generation TODO
 
@@ -3755,12 +3773,21 @@ class FreesurferWhiteMatterMaskGenerator(ScriptGenerator):
                 'md_map': eve3_dir/'dwmri%md.nii.gz',
                 'ad_map': eve3_dir/'dwmri%ad.nii.gz',
                 'rd_map': eve3_dir/'dwmri%rd.nii.gz',
-                't1b0_registration': eve3_dir/'dwmri%ANTS_t1tob0.txt',
+                't1b0_registration': eve3_dir/'dwmri%ANTS_t1tob0.txt'
+                }
             #freesurfer outputs (which we NEED to have)
-                'wmparc': fs_dir/'freesurfer'/'mri'/'wmparc.mgz',
-                'rawavg': fs_dir/'freesurfer'/'mri'/'rawavg.mgz',
-                'aseg.stats': fs_dir/'freesurfer'/'stats'/'aseg.stats'
-            }
+            if self.setup.args.use_infant_fs:
+                self.inputs_dict[self.count]['wmparc'] = {'src_path': fs_dir/'mri'/'aseg.mgz', 'targ_name': 'wmparc.mgz'}
+                self.inputs_dict[self.count]['rawavg'] = {'src_path': t1, 'targ_name': 'rawavg.mgz'}
+                #need to have the brainvol.stats and either lh.aparc.stats or rh.aparc.stats for the eTICV
+                    #then when generating the scripts, the two need to be combined
+                self.inputs_dict[self.count]['brainvol_stats'] = fs_dir/'stats'/'brainvol.stats' #{'src_path': fs_dir/'stats'/'brainvol.stats', 'targ_name': 'brainvol.stats'}
+                self.inputs_dict[self.count]['lh_aparc_stats'] = fs_dir/'stats'/'lh.aparc.stats' #{'src_path': fs_dir/'stats'/'lh.aparc.stats', 'targ_name': 'lh.aparc.stats'}
+            else:
+                self.inputs_dict[self.count]['wmparc'] = fs_dir/'freesurfer'/'mri'/'wmparc.mgz',
+                self.inputs_dict[self.count]['rawavg'] = fs_dir/'freesurfer'/'mri'/'rawavg.mgz',
+                self.inputs_dict[self.count]['aseg.stats'] = fs_dir/'freesurfer'/'stats'/'aseg.stats'
+            
             self.outputs[self.count] = []
 
             #now we can start the script generation
