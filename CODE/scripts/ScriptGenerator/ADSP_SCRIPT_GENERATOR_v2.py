@@ -1147,7 +1147,7 @@ class ScriptGenerator:
         Given a EVE3 directory, return the BIDS fields
         """
         #get the sub, ses from the directory
-        if pqdir.parent.parent.name == 'derivatives':
+        if pqdir.parent.parent.name == 'derivatives' or pqdir.parent.parent.name == 'results':
             sub = pqdir.parent.name
             ses = ''
         else:
@@ -3690,6 +3690,8 @@ class FreesurferWhiteMatterMaskGenerator(ScriptGenerator):
             lh_aparc_stats = "{}/lh.aparc.stats".format(session_input)
             script.write("cat {} > {}/aseg.stats\n".format(brainvol_stats, session_input))
             script.write("cat {} | grep eTIV >> {}/aseg.stats\n".format(lh_aparc_stats, session_input))
+            script.write("echo Converting T1 to mgz...\n")
+            script.write("singularity exec -e --contain -B /tmp:/tmp -B {}:/usr/local/freesurfer/.license -B {}:{} {} mri_convert {}/rawavg.nii.gz {}/rawavg.mgz\n".format(self.setup.freesurfer_license_path, session_input, session_input, self.setup.simg, session_input, session_input))
         
         #if no PQ, then we must make a dummy mask
         if self.setup.args.no_pq:
@@ -3707,7 +3709,7 @@ class FreesurferWhiteMatterMaskGenerator(ScriptGenerator):
 
         extra_args = "/PYTHON3/get_fs_global_wm_metrics.py /INPUTS wmparc.mgz rawavg.mgz dwmri%ANTS_t1tob0.txt dwmri%fa.nii.gz dwmri%md.nii.gz dwmri%ad.nii.gz dwmri%rd.nii.gz mask.nii.gz aseg.stats /OUTPUTS --freesurfer_license_path /usr/local/freesurfer/.license"
 
-        script.write("echo Running Freesurfer White Matter Mask Metic Calculation...\n")
+        script.write("echo Running Freesurfer White Matter Mask Metric Calculation...\n")
         script.write("singularity exec -e --contain -B /tmp:/tmp -B {}:/INPUTS -B {}:/OUTPUTS -B {}:/usr/local/freesurfer/.license {} {}\n".format(session_input, session_output, self.setup.freesurfer_license_path, self.setup.simg, extra_args))
         script.write("echo Done running Freesurfer White Matter Mask Metric Calculation. Now deleting inputs and copying back outputs...\n")
 
@@ -3762,7 +3764,7 @@ class FreesurferWhiteMatterMaskGenerator(ScriptGenerator):
             #check to see if we are using infant freesurfer or not
             if self.setup.args.use_infant_fs:
                 fs_dir = self.setup.dataset_derivs/(sub)/(ses)/("infantFS{}{}".format(anat_acq, anat_run))
-                if self.has_infantFS_outputs(fs_dir):
+                if not self.has_infantFS_outputs(fs_dir):
                     self.add_to_missing(sub, ses, acq, run, 'infant_freesurfer')
                     continue
             else:
@@ -3800,7 +3802,7 @@ class FreesurferWhiteMatterMaskGenerator(ScriptGenerator):
             #freesurfer outputs (which we NEED to have)
             if self.setup.args.use_infant_fs:
                 self.inputs_dict[self.count]['wmparc'] = {'src_path': fs_dir/'mri'/'aseg.mgz', 'targ_name': 'wmparc.mgz'}
-                self.inputs_dict[self.count]['rawavg'] = {'src_path': t1, 'targ_name': 'rawavg.mgz'}
+                self.inputs_dict[self.count]['rawavg'] = {'src_path': t1, 'targ_name': 'rawavg.nii.gz'}
                 #need to have the brainvol.stats and either lh.aparc.stats or rh.aparc.stats for the eTICV
                     #then when generating the scripts, the two need to be combined
                 self.inputs_dict[self.count]['brainvol_stats'] = fs_dir/'stats'/'brainvol.stats' #{'src_path': fs_dir/'stats'/'brainvol.stats', 'targ_name': 'brainvol.stats'}
