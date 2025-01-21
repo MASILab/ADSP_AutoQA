@@ -76,6 +76,7 @@ def pa():
     p.add_argument('--bedpost_use_pq', action='store_true', help="If you want to use the PreQual outputs for BedpostX instead of the raw DWI")
     p.add_argument('--no_t1seg', action='store_true', help="If you do not want to use a T1segmentation for EVE3 pipeline. (note that BET will be used instead)")
     p.add_argument('--use_infant_fs', action='store_true', help="If you want to use the infantFS pipeline instead of the regular FreeSurfer pipeline for the FSWM mask")
+    p.add_argument('--no_pq', action='store_true', help="If we do not have prequal outputs for the FSWM mask")
     return p.parse_args()
 
 class ScriptGeneratorSetup:
@@ -3689,6 +3690,20 @@ class FreesurferWhiteMatterMaskGenerator(ScriptGenerator):
             lh_aparc_stats = "{}/lh.aparc.stats".format(session_input)
             script.write("cat {} > {}/aseg.stats\n".format(brainvol_stats, session_input))
             script.write("cat {} | grep eTIV >> {}/aseg.stats\n".format(lh_aparc_stats, session_input))
+        
+        #if no PQ, then we must make a dummy mask
+        if self.setup.args.no_pq:
+            script.write("echo Making dummy mask...\n")
+            temp_file = "{}/temp.nii.gz".format(session_input)
+            mask_file = "{}/mask.nii.gz".format(session_input)
+            cmd1 = "export FSLOUTPUTTYPE=NIFTI_GZ"
+            cmd2 = "fslmaths.fsl '{}/dwmri%fa.nii.gz' -mul 0 {}".format(session_input, temp_file)
+            cmd3 = "fslmaths.fsl {} -add 1 {}".format(temp_file, mask_file)
+            script.write("singularity exec -e --contain -B /tmp:/tmp -B {}:{} {} bash -c \"{} ; {} ; {}\"\n".format(session_input, session_input, self.setup.simg, cmd1, cmd2, cmd3))
+            script.write("rm {}\n".format(temp_file))
+            #export FSLOUTPUTTYPE=NIFTI_GZ
+            #fslmaths.fsl T1.nii.gz -mul 0 temp.nii.gz
+            #fslmaths.fsl temp.nii.gz -add 1 ones.nii.gz
 
         extra_args = "/PYTHON3/get_fs_global_wm_metrics.py /INPUTS wmparc.mgz rawavg.mgz dwmri%ANTS_t1tob0.txt dwmri%fa.nii.gz dwmri%md.nii.gz dwmri%ad.nii.gz dwmri%rd.nii.gz mask.nii.gz aseg.stats /OUTPUTS --freesurfer_license_path /usr/local/freesurfer/.license"
 
@@ -3715,11 +3730,14 @@ class FreesurferWhiteMatterMaskGenerator(ScriptGenerator):
                 continue
             
             #check to make sure the outputs for PreQual exist
-            prequal_dir = self.setup.dataset_derivs/(sub)/(ses)/("PreQual{}{}".format(acq, run))
-            #if not self.has_PreQual_outputs(prequal_dir):
-            if not all(self.check_PQ_outputs(prequal_dir)):
-                self.add_to_missing(sub, ses, acq, run, 'PreQual')
-                continue
+            if self.setup.args.no_pq:
+                pass
+            else:
+                prequal_dir = self.setup.dataset_derivs/(sub)/(ses)/("PreQual{}{}".format(acq, run))
+                #if not self.has_PreQual_outputs(prequal_dir):
+                if not all(self.check_PQ_outputs(prequal_dir)):
+                    self.add_to_missing(sub, ses, acq, run, 'PreQual')
+                    continue
 
             #check to make sure that the outputs for EVE3 exist
             if not self.has_EVE3WMAtlas_outputs(eve3_dir):
@@ -3727,7 +3745,10 @@ class FreesurferWhiteMatterMaskGenerator(ScriptGenerator):
                 continue
 
             #get the T1 that was used for PreQual/EVE3. If we cannot get it, then select it again using the function
-            t1 = self.get_prov_t1(prequal_dir)
+            if self.setup.args.no_pq:
+                t1 = self.get_prov_t1(eve3_dir, EVE3=True)
+            else:
+                t1 = self.get_prov_t1(prequal_dir)
             if not t1:
                 #get the T1 using the function, and print out a provenance warning
                 print("Warning: Could not get provenance T1 for {}/{}/{}".format(sub,ses,prequal_dir))
@@ -3767,7 +3788,6 @@ class FreesurferWhiteMatterMaskGenerator(ScriptGenerator):
             self.inputs_dict[self.count] = {
             #may need to have a flag here for if we are not using the PreQual mask
                 #'pq_dwi_dir': {'src_path': prequal_dir/'PREPROCESSED', 'targ_name': '', 'directory': True}, #need PreQual for the mask
-                'pq_mask': prequal_dir/'PREPROCESSED'/'mask.nii.gz',
             #here is where we would add the flag for if we are generating our own maps and registrations
                 'fa_map': eve3_dir/'dwmri%fa.nii.gz',
                 'md_map': eve3_dir/'dwmri%md.nii.gz',
@@ -3775,6 +3795,8 @@ class FreesurferWhiteMatterMaskGenerator(ScriptGenerator):
                 'rd_map': eve3_dir/'dwmri%rd.nii.gz',
                 't1b0_registration': eve3_dir/'dwmri%ANTS_t1tob0.txt'
                 }
+            if not self.setup.args.no_pq:
+                self.inputs_dict[self.count]['pq_mask'] = prequal_dir/'PREPROCESSED'/'mask.nii.gz'
             #freesurfer outputs (which we NEED to have)
             if self.setup.args.use_infant_fs:
                 self.inputs_dict[self.count]['wmparc'] = {'src_path': fs_dir/'mri'/'aseg.mgz', 'targ_name': 'wmparc.mgz'}
@@ -3784,8 +3806,8 @@ class FreesurferWhiteMatterMaskGenerator(ScriptGenerator):
                 self.inputs_dict[self.count]['brainvol_stats'] = fs_dir/'stats'/'brainvol.stats' #{'src_path': fs_dir/'stats'/'brainvol.stats', 'targ_name': 'brainvol.stats'}
                 self.inputs_dict[self.count]['lh_aparc_stats'] = fs_dir/'stats'/'lh.aparc.stats' #{'src_path': fs_dir/'stats'/'lh.aparc.stats', 'targ_name': 'lh.aparc.stats'}
             else:
-                self.inputs_dict[self.count]['wmparc'] = fs_dir/'freesurfer'/'mri'/'wmparc.mgz',
-                self.inputs_dict[self.count]['rawavg'] = fs_dir/'freesurfer'/'mri'/'rawavg.mgz',
+                self.inputs_dict[self.count]['wmparc'] = fs_dir/'freesurfer'/'mri'/'wmparc.mgz'
+                self.inputs_dict[self.count]['rawavg'] = fs_dir/'freesurfer'/'mri'/'rawavg.mgz'
                 self.inputs_dict[self.count]['aseg.stats'] = fs_dir/'freesurfer'/'stats'/'aseg.stats'
             
             self.outputs[self.count] = []
