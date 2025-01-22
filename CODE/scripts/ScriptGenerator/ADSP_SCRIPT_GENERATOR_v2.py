@@ -3972,11 +3972,15 @@ class InfantFreesurferGenerator(ScriptGenerator):
 
         #iterate through the rows of the CSV
         demog_df = pd.read_csv(demogs_csv)
+        sub_ses_list = []
         for index, row in tqdm(demog_df.iterrows()):
             #get the subject, age, and session (if it exists)
             sub = row['subject']
             age = row['age']
             ses = row['session'] if 'session' in row else None
+            if (sub,ses) in sub_ses_list:
+                continue
+            sub_ses_list.append((sub,ses))
 
             #if age or subject is missing, skip and add to the missing list
             if not sub or not age:
