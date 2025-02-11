@@ -77,6 +77,7 @@ def pa():
     p.add_argument('--no_t1seg', action='store_true', help="If you do not want to use a T1segmentation for EVE3 pipeline. (note that BET will be used instead)")
     p.add_argument('--use_infant_fs', action='store_true', help="If you want to use the infantFS pipeline instead of the regular FreeSurfer pipeline for the FSWM mask")
     p.add_argument('--no_pq', action='store_true', help="If we do not have prequal outputs for the FSWM mask")
+    p.add_argument('--force_no_topup', action='store_true', help="If you want to force not running topup for PreQual (only advised if you have already preprocessed the data and run TOPUP/susceptibility distortion correction)")
     return p.parse_args()
 
 class ScriptGeneratorSetup:
@@ -1542,7 +1543,7 @@ class PreQualGenerator(ScriptGenerator):
         #setup the options for PreQual
         PEaxis = kwargs['PEaxis']
         opts = ''
-        if self.setup.args.dataset_name == "HCPA" or self.setup.args.dataset_name == "HCPD" or self.setup.args.dataset_name == "HCP":
+        if self.setup.args.dataset_name == "HCPA" or self.setup.args.dataset_name == "HCPD" or self.setup.args.dataset_name == "HCP" or self.setup.args.dataset_name == "dHCPinfant":
             #we want to turn off all PREPROCESSING steps possible
             opts = '--denoise off --synb0 off'
         elif self.setup.args.dataset_name == "OASIS3" or self.setup.args.dataset_name == "IBIS":
@@ -1711,31 +1712,37 @@ class PreQualGenerator(ScriptGenerator):
                         PEaxis, PEsign, PEunknown = 'j', ['+'], None
                     else:
                         (PEaxis, PEsign, PEunknown) = get_PE_dirs([need_json_dicts[dir_num]], [need_jsons[dir_num]], single=True) #returns a single tuple
-                    #definitely needs a T1 for synb0
-                    needs_synb0 = True
-                    #check for a T1
-                    t1 = self.get_t1(dwi_dir.parent/("anat"), sub, ses)
-                    if not t1:
-                        self.add_to_missing(sub, ses, acq, run, 'T1_missing')
-                        continue
-                    #if you want to run with the T1 stripped
-                    if self.setup.args.skull_stripped:
-                        #also must find the corresponding SLANT segmentaion
-                        #based on the T1, get the TICV/UNest segmentation
-                        ses_deriv = pqdir.parent
-                        if not self.setup.args.use_unest_seg:
-                            seg = self.get_TICV_seg_file(t1, ses_deriv)
-                        else:
-                            seg = self.get_UNest_seg_file(t1, ses_deriv)
-                        if not seg or not seg.exists():
-                            self.add_to_missing(sub, ses, acq, run, 'TICV' if not self.setup.args.use_unest_seg else 'UNest')
+                    #definitely needs a T1 for synb0, unless forcibly specified otherwise
+                    if self.setup.args.force_no_topup:
+                        #we don't need to run TOPUP, so we don't need a T1
+                        needs_synb0 = False
+                    else:
+                        needs_synb0 = True
+                        #check for a T1
+                        t1 = self.get_t1(dwi_dir.parent/("anat"), sub, ses)
+                        if not t1:
+                            self.add_to_missing(sub, ses, acq, run, 'T1_missing')
                             continue
+                        #if you want to run with the T1 stripped
+                        if self.setup.args.skull_stripped:
+                            #also must find the corresponding SLANT segmentaion
+                            #based on the T1, get the TICV/UNest segmentation
+                            ses_deriv = pqdir.parent
+                            if not self.setup.args.use_unest_seg:
+                                seg = self.get_TICV_seg_file(t1, ses_deriv)
+                            else:
+                                seg = self.get_UNest_seg_file(t1, ses_deriv)
+                            if not seg or not seg.exists():
+                                self.add_to_missing(sub, ses, acq, run, 'TICV' if not self.setup.args.use_unest_seg else 'UNest')
+                                continue
 
                     self.count += 1 #we should have everything, so we can generate the script
                     self.warnings[self.count] = ''
                     #warning if PEunknown
                     if PEunknown:
                         self.warnings[self.count] += "echo Warning: Unknown PE direction. Assuming j.\n"
+                    if self.setup.args.force_no_topup:
+                        self.warnings[self.count] += "echo Warning: Forcibly not running TOPUP by not providing RPE or T1.\n"
                     #create the directories
                     (session_input, session_output) = self.make_session_dirs(sub, ses, acq, run, tmp_input_dir=self.setup.tmp_input_dir,
                                             tmp_output_dir=self.setup.tmp_output_dir)
