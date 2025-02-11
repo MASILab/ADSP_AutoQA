@@ -1754,7 +1754,9 @@ class PreQualGenerator(ScriptGenerator):
                         self.warnings[self.count] += "Running synb0 with skull-stripped T1\n"
                     else:
                         self.inputs_dict[self.count] = {'dwi': need_dwis[dir_num], 'bval': need_bvals[dir_num],
-                                                    'bvec': need_bvecs[dir_num], 't1': {'src_path':t1, 'targ_name': 't1.nii.gz'}}
+                                                    'bvec': need_bvecs[dir_num]}
+                        if needs_synb0:
+                            self.inputs_dict[self.count]['t1'] = {'src_path':t1, 'targ_name': 't1.nii.gz'}
                     #if run != '':
                     #    print(self.inputs_dict[self.count])
                     self.outputs[self.count] = []
