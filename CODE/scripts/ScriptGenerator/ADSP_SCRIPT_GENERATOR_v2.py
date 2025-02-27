@@ -78,6 +78,7 @@ def pa():
     p.add_argument('--use_infant_fs', action='store_true', help="If you want to use the infantFS pipeline instead of the regular FreeSurfer pipeline for the FSWM mask")
     p.add_argument('--no_pq', action='store_true', help="If we do not have prequal outputs for the FSWM mask")
     p.add_argument('--force_no_topup', action='store_true', help="If you want to force not running topup for PreQual (only advised if you have already preprocessed the data and run TOPUP/susceptibility distortion correction)")
+    p.add_argumen('--set_neg_age_to_zero', action='store_true', help="If you want to set the negative ages to zero for the infantFS pipeline")
     return p.parse_args()
 
 class ScriptGeneratorSetup:
@@ -4003,6 +4004,11 @@ class InfantFreesurferGenerator(ScriptGenerator):
                 self.add_to_missing(sub, ses, '', '', 'age_over_2')
                 print("ERROR: Age over 2 for {}/{}".format(sub, ses))
                 continue
+            if age < 0:
+                if self.setup.args.set_neg_age_to_zero:
+                    age = 0
+                else:
+                    print("ERROR: Age less than 0 for {}/{}".format(sub, ses))
 
             #get the list of T1s for the subject/session
             dataset_root = self.setup.root_dataset_path
