@@ -78,7 +78,7 @@ def pa():
     p.add_argument('--use_infant_fs', action='store_true', help="If you want to use the infantFS pipeline instead of the regular FreeSurfer pipeline for the FSWM mask")
     p.add_argument('--no_pq', action='store_true', help="If we do not have prequal outputs for the FSWM mask")
     p.add_argument('--force_no_topup', action='store_true', help="If you want to force not running topup for PreQual (only advised if you have already preprocessed the data and run TOPUP/susceptibility distortion correction)")
-    p.add_argumen('--set_neg_age_to_zero', action='store_true', help="If you want to set the negative ages to zero for the infantFS pipeline")
+    p.add_argument('--set_neg_age_to_zero', action='store_true', help="If you want to set the negative ages to zero for the infantFS pipeline")
     return p.parse_args()
 
 class ScriptGeneratorSetup:
@@ -1591,7 +1591,7 @@ class PreQualGenerator(ScriptGenerator):
                 str(self.setup.simg), str(t1), str(mask_file), str(t1_temp)))
             script.write('rm {}\n'.format(str(t1)))
             script.write('mv {} {}\n'.format(str(t1_temp), str(t1)))
-            script.write('Done skull stripping T1 for synb0. NOW running PreQual...\n')
+            script.write('echo Done skull stripping T1 for synb0. NOW running PreQual...\n')
         script.write('singularity run -e --contain -B {}:/INPUTS -B {}:/OUTPUTS -B {}:/APPS/freesurfer/license.txt -B /tmp:/tmp {} {} {}\n'.format(str(session_input),
             str(session_output), str(self.setup.freesurfer_license_path), str(self.setup.simg), PEaxis, opts))
         script.write("echo Finished running PreQual. Now removing inputs and copying outputs back...\n")
