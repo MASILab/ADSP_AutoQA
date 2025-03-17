@@ -388,9 +388,9 @@ class ScriptGeneratorSetup:
             slurm.write("\n")
 
             if self.args.pipeline == 'freesurfer' or self.args.pipeline == 'NODDI':
-                slurm.write("module load FreeSurfer/7.2.0 GCC/6.4.0-2.28 OpenMPI/2.1.1 FSL/5.0.10\n")
-                slurm.write("source $FREESURFER_HOME/FreeSurferEnv.sh\n")
-                slurm.write("export FSL_DIR=/accre/arch/easybuild/software/MPI/GCC/6.4.0-2.28/OpenMPI/2.1.1/FSL/5.0.10/fsl\n")
+                #slurm.write("module load FreeSurfer/7.2.0 GCC/6.4.0-2.28 OpenMPI/2.1.1 FSL/5.0.10\n")
+                #slurm.write("source $FREESURFER_HOME/FreeSurferEnv.sh\n")
+                #slurm.write("export FSL_DIR=/accre/arch/easybuild/software/MPI/GCC/6.4.0-2.28/OpenMPI/2.1.1/FSL/5.0.10/fsl\n")
                 slurm.write("\n")
 
             slurm.write("SCRIPT_DIR={}/\n".format(self.script_dir))
