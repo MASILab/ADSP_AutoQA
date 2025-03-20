@@ -73,6 +73,7 @@ def pa():
     p.add_argument('--tractseg_DTI_use_all_shells', action='store_true', help="If you want to forego the shelling for calculating DTI measures")
     p.add_argument('--select_sessions_list', type=str, default='', help="If you want to run only a subset of scans/sessions, provide a path to a list of sessions directories to run FOR THAT SPECIFIC PIPELINE. (e.g. for TICV, provide a list of T1s, for PreQual provide a list of dwi dirs, for EVE3 provide a list of PreQual directories, etc.)")
     p.add_argument('--infant_csv', type=str, default='', help="Path to the demographics csv file that is required as input for the infantFS pipeline")
+    p.add_argument('--demogs_csv', type=str, default='', help="Path to the demographics csv file that is required as input for the BRAID pipeline")
     p.add_argument('--bedpost_use_pq', action='store_true', help="If you want to use the PreQual outputs for BedpostX instead of the raw DWI")
     p.add_argument('--no_t1seg', action='store_true', help="If you do not want to use a T1segmentation for EVE3 pipeline. (note that BET will be used instead)")
     p.add_argument('--use_infant_fs', action='store_true', help="If you want to use the infantFS pipeline instead of the regular FreeSurfer pipeline for the FSWM mask")
@@ -125,7 +126,8 @@ class ScriptGeneratorSetup:
             "freewater": FreewaterGenerator,
             "FreesurferWhiteMatterMask": FreesurferWhiteMatterMaskGenerator,
             "rawEVE3WMAtlas": RawEVE3WMAtlasGenerator,
-            "infantFS": InfantFreesurferGenerator
+            "infantFS": InfantFreesurferGenerator,
+            "BRAID": BRAIDGenerator,
 
             ##TODO: add the other pipelines
 
@@ -257,6 +259,7 @@ class ScriptGeneratorSetup:
                         'FreesurferWhiteMatterMaskGenerator': '/nobackup/p_masi/Singularities/FreesurferWhiteMatterMask.simg',#[freesurfer_simg, wmatlas_simg]
                         'rawEVE3WMAtlas': wmatlas_simg,
                         "infantFS" : "/nobackup/p_masi/Singularities/infantfs_v0.0.sif",
+                        "BRAID": "/nobackup/p_masi/Singularities/braid_v1.0.0.sif",
                     }
             simg = mapping[self.args.pipeline]
         except:
@@ -388,9 +391,9 @@ class ScriptGeneratorSetup:
             slurm.write("\n")
 
             if self.args.pipeline == 'freesurfer' or self.args.pipeline == 'NODDI':
-                #slurm.write("module load FreeSurfer/7.2.0 GCC/6.4.0-2.28 OpenMPI/2.1.1 FSL/5.0.10\n")
-                #slurm.write("source $FREESURFER_HOME/FreeSurferEnv.sh\n")
-                #slurm.write("export FSL_DIR=/accre/arch/easybuild/software/MPI/GCC/6.4.0-2.28/OpenMPI/2.1.1/FSL/5.0.10/fsl\n")
+                slurm.write("#module load FreeSurfer/7.2.0 GCC/6.4.0-2.28 OpenMPI/2.1.1 FSL/5.0.10\n")
+                slurm.write("#source $FREESURFER_HOME/FreeSurferEnv.sh\n")
+                slurm.write("#export FSL_DIR=/accre/arch/easybuild/software/MPI/GCC/6.4.0-2.28/OpenMPI/2.1.1/FSL/5.0.10/fsl\n")
                 slurm.write("\n")
 
             slurm.write("SCRIPT_DIR={}/\n".format(self.script_dir))
@@ -535,6 +538,13 @@ class ScriptGenerator:
         pass
         #raise NotImplementedError("Error: infant_freesurfer_script_generate not implemented")
 
+    def braid_script_generate(self):
+        """
+        Abstract method to be implemented by the child class
+        """
+        pass
+        #raise NotImplementedError("Error: braid_script_generate not implemented")
+
     ## END ABSTRACT CLASSES ##
 
     def __init__(self, setup_object):
@@ -569,7 +579,8 @@ class ScriptGenerator:
             "BedpostX_plus_Tractseg": self.bedpostx_plus_dwi_plus_tractseg_script_generate,
             "FreesurferWhiteMatterMask": self.freesurfer_white_matter_mask_script_generate,
             "rawEVE3WMAtlas": self.rawEVE3Registration_script_generate,
-            "infantFS": self.infant_freesurfer_script_generate
+            "infantFS": self.infant_freesurfer_script_generate,
+            "BRAID": self.braid_script_generate,
         }
 
         self.necessary_outputs = {
@@ -629,7 +640,8 @@ class ScriptGenerator:
             'freesurfer': [],
             'FreesurferWhiteMatterMask': [],
             'rawEVE3WMAtlas': [],
-            'infantFS': []
+            'infantFS': [],
+            'BRAID': []
             ### TODO: add the necessary outputs for the other pipelines
                 #this cannot be static for all the outputs for all pipelines, only some of them
         }
@@ -860,6 +872,17 @@ class ScriptGenerator:
                 return False
         return True
 
+    def has_BRAID_outputs(self, braid_dir):
+        """
+        Given the path to the BRAID directory, returns True if the outputs exist, False otherwise
+        """
+
+        logfile = braid_dir/("log.txt")
+        braid_csv = braid_dir/('final')/("braid_predictions.csv")
+        if not logfile.exists() or not braid_csv.exists():
+            return False
+        return True
+
     def has_infantFS_outputs(self, infant_fs_dir):
         """
         Given the path to an infant FS directory, returns True if the outputs exist, False otherwise
@@ -986,6 +1009,57 @@ class ScriptGenerator:
         #if we have gotten here, return the first T1 that we find
         print("Using {} for {}_{}".format(t1s[0], sub, ses))
         return t1s[0]
+
+    #create a function
+    def get_braid_json_input(self, demogs, sub, ses):
+        """
+        Gets the text required to make the BRAID pipeline inputs
+        
+        Returns (None,reason) if the row in the CSV does not exist or there are other errors
+        
+        Returns (str, None) if the row exists and is valid
+        """
+        rows = demogs.loc[demogs['subject'] == sub]
+        if ses != '':
+            rows = rows.loc[rows['session'] == ses]
+        if len(rows) == 0:
+            return (None, 'demog_row_DNE') #does not exist
+        if len(rows) > 1:
+            print(f"{sub}_{ses} has more than one row in demogs. Using only first")
+            return (None, 'more_than_one_demog_row') #more than one
+
+        #gets the age, sex, and race for the scanning session
+        age = rows['age'].values[0] if 'age' in rows.columns else 'null'
+        sex = rows['sex'].values[0] if 'sex' in rows.columns else 'null'
+        race = rows['race'].values[0] if 'race' in rows.columns else 'null'
+
+        #if they are missing then make them 'null'
+        if np.isnan(age):
+            age = 'null'
+        if np.isnan(sex):
+            sex = 'null'
+        if np.isnan(race):
+            race = 'null'
+
+        #checks to make sure that the values are appropriate
+        try:
+            age = float(age) if age != 'null' else 'null'
+        except:
+            assert False, "Age is not a float for {}_{} in the demographics".format(sub, ses)
+        try:
+            sex = int(sex) if sex != 'null' else 'null'
+        except:
+            assert False, "Sex is not an int for {}_{} in the demographics".format(sub, ses)
+        try:
+            race = int(race) if race != 'null' else 'null'
+        except:
+            assert False, "Race is not an int for {}_{} in the demographics".format(sub, ses)
+        
+        #now make the JSON string
+        json_string = "{{\"age\": {}, \"sex\": {}, \"race\": {}}}".format(age, sex, race)
+        
+        return (json_string, None)
+        
 
     def get_prov_t1(self, dir, EVE3=False):
         """
@@ -3229,6 +3303,115 @@ class FreewaterGenerator(ScriptGenerator):
 
             #start the script generation
             self.start_script_generation(session_input, session_output, deriv_output_dir=fw_target)
+
+class BRAIDGenerator(ScriptGenerator):
+    """
+    Class for generating BRAID scripts
+    """
+
+    def __init__(self, setup_object):
+        super().__init__(setup_object=setup_object)
+
+        #self.warnings = {}
+        self.outputs = {}
+        self.inputs_dict = {}
+
+        self.generate_braid_scripts()
+
+    def braid_script_generate(self, script, session_input, session_output, **kwargs):
+        """
+        Writes the command for running BRAID registration to a script
+        """
+
+        script.write("echo Running setup for BRAID...\n")
+        #create the json.txt file
+        script.write("echo Creating json.txt file...\n")
+        script.write("echo '{}' > {}/demog.json\n".format(kwargs['json_text'], session_input))
+        script.write("echo Running BRAID...\n")
+        
+        script.write("singularity run -e --contain -B /tmp:/tmp -B {}:/INPUTS -B {}:/OUTPUTS {} > {}/log.txt\n".format(session_input, session_output, self.setup.simg, session_output))
+        
+        script.write("echo Finished running BRAID. Now removing inputs and copying outputs back...\n")
+
+        #delete the temporary files
+        #delete everything in the top directory that is not named log.txt
+        script.write("find {} -mindepth 1 -maxdepth 1 ! -name 'log.txt' -exec rm {{}} \;\n".format(session_output))
+        #write the json file to the outputs as well
+        script.write("cp {}/demog.json {}/\n".format(session_input, session_output))
+
+    def generate_braid_scripts(self):
+        """
+        Generates BRAID scripts
+        """
+
+        demogs_csv = Path(self.setup.args.demogs_csv)
+        assert demogs_csv.exists(), "Error: Demogs CSV file does not exist at {}".format(demogs_csv)
+        #read the csv
+        demogs_df = pd.read_csv(demogs_csv)
+
+        prequal_dirs = self.get_PreQual_dirs()
+
+        for pqdir_p in tqdm(prequal_dirs):
+            pqdir = Path(pqdir_p)
+            #get the BIDS tags
+            sub, ses, acq, run = self.get_BIDS_fields_from_PQdir(pqdir)
+
+            #check to see if the BRAID outputs already exist
+            braiddir = self.setup.dataset_derivs/(sub)/(ses)/("BRAID{}{}".format(acq, run))
+            if self.has_BRAID_outputs(braiddir):
+                continue
+
+            #check to see if the PreQual outputs exist
+            if not all(self.check_PQ_outputs(pqdir)):
+                self.add_to_missing(sub, ses, acq, run, 'PreQual')
+                continue
+
+            #get the T1 that was used for PreQual. If we cannot get it, then select it again using the function
+            t1 = self.get_prov_t1(pqdir)
+            if not t1:
+                #get the T1 using the function, and print out a provenance warning
+                print("Warning: Could not get provenance T1 for {}/{}/{}".format(sub,ses,pqdir))
+                t1 = self.get_t1(self.setup.root_dataset_path/(sub)/(ses)/("anat"), sub, ses)
+                if not t1:
+                    self.add_to_missing(sub, ses, acq, run, 'T1')
+                    continue
+            
+            #based on the T1, get the TICV/UNest segmentation
+            ses_deriv = pqdir.parent
+            if not self.setup.args.use_unest_seg:
+                seg = self.get_TICV_seg_file(t1, ses_deriv)
+            else:
+                seg = self.get_UNest_seg_file(t1, ses_deriv)
+            if not seg.exists():
+                self.add_to_missing(sub, ses, acq, run, 'TICV' if not self.setup.args.use_unest_seg else 'UNest')
+                continue
+
+            #grab the information from the CSV directory
+            (json_text,reason) = self.get_braid_json_input(demogs_df, sub, ses)
+            if json_text is None:
+                self.add_to_missing(sub, ses, acq, run, reason)
+                continue
+
+            self.count += 1
+
+            #setup the temp directories
+            (session_input, session_output) = self.make_session_dirs(sub, ses, acq, run, tmp_input_dir=self.setup.tmp_input_dir,
+                                            tmp_output_dir=self.setup.tmp_output_dir)
+
+            #create the output target directory
+            braid_target = self.setup.output_dir/(sub)/(ses)/("BRAID{}{}".format(acq, run))
+            if not braid_target.exists():
+                os.makedirs(braid_target)
+
+            #setup the inputs dictionary and outputs list            
+            self.inputs_dict[self.count] = {'t1': {'src_path': t1, 'targ_name': 'T1w.nii.gz'},
+                                            'seg': {'src_path': seg, 'targ_name': 'T1w_seg.nii.gz'},
+                                            'pq_dwi_dir': {'src_path': pqdir/'PREPROCESSED', 'targ_name': '', 'directory': True}
+                                        }
+            self.outputs[self.count] = []
+
+            #start the script generation
+            self.start_script_generation(session_input, session_output, deriv_output_dir=braid_target, json_text=json_text)
 
 #for Kurt: DTI + Tractseg on preprocessed data
 class DWI_plus_TractsegGenerator(ScriptGenerator):
