@@ -4176,7 +4176,7 @@ class InfantFreesurferGenerator(ScriptGenerator):
             sub_ses_list.append((sub,ses))
 
             #if age or subject is missing, skip and add to the missing list
-            if not sub or not age:
+            if not sub or np.isnan(age):
                 self.add_to_missing(sub, ses, '', '', 'missing_subject_or_age')
                 continue
                 #check to see if the age is greater than 2
