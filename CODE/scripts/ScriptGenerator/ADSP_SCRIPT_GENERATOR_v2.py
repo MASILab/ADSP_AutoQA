@@ -1457,7 +1457,10 @@ class ScriptGenerator:
             script.write('rm -r {}\n'.format(str(session_input)+'/*'))
 
             #write the yaml config file
-            self.write_config_yml_lines(script, session_output, kwargs['deriv_output_dir'])
+            if 'temp_is_output' in kwargs:
+                self.write_config_yml_lines(script, session_output, kwargs['deriv_output_dir'], temp_dir=kwargs['temp_dir'])
+            else:
+                self.write_config_yml_lines(script, session_output, kwargs['deriv_output_dir'])
 
             #copy ALL the outputs back to the output directory (and ensure the proper provenance?)
             ## TODO: Write the provenance check for the key outputs
@@ -1517,7 +1520,7 @@ class ScriptGenerator:
         with open(deriv_output/'config.yml', 'w') as yml:
             yaml.dump(config_yml, yml, default_flow_style=False)
         
-    def write_config_yml_lines(self, script, session_output, deriv_output):
+    def write_config_yml_lines(self, script, session_output, deriv_output, temp_dir=None):
         """
         Writes the lines to a script that output a config yaml file, then the line that copies it back to the output directory
         """
@@ -1567,6 +1570,8 @@ class ScriptGenerator:
 
         script.write("echo Writing config.yml file...\n")
         script.write("echo \"{}\" > {}/{}\n".format(yaml.dump(config_yml, default_flow_style=False), str(session_output), config_yml_name))
+        if temp_dir:
+            script.write("cp {}/{} {}/{}\n".format(str(session_output), config_yml_name, temp_dir, config_yml_name))
         script.write("echo Done writing config.yml file. Now copying it back...\n")
         if not self.setup.args.no_scp:
             script.write("scp {}/{} {}@{}:{}/\n".format(str(session_output), config_yml_name, self.setup.vunetID, self.setup.args.src_server, str(deriv_output)))
