@@ -80,6 +80,7 @@ def pa():
     p.add_argument('--no_pq', action='store_true', help="If we do not have prequal outputs for the FSWM mask")
     p.add_argument('--force_no_topup', action='store_true', help="If you want to force not running topup for PreQual (only advised if you have already preprocessed the data and run TOPUP/susceptibility distortion correction)")
     p.add_argument('--set_neg_age_to_zero', action='store_true', help="If you want to set the negative ages to zero for the infantFS pipeline")
+    p.add_argument('--use_synthstrip', action='store_true', help="If you want to use SynthStrip for PreQual instead of UNest/TICV")
     return p.parse_args()
 
 class ScriptGeneratorSetup:
@@ -1172,6 +1173,27 @@ class ScriptGenerator:
         unest_seg = unest_dir/("{}{}{}{}_T1w_seg_merged_braincolor.nii.gz".format(sub,ses,acq,run))
         return unest_seg
 
+    def get_synthstrip_file(self, t1, ses_deriv):
+        """
+        Returns the T1 synthstrip file associated with the T1 file. Returns None if the file does not exist.
+        """
+        #get the acquisition and run name from the T1
+        sub, ses, acq, run = self.get_BIDS_fields_t1(t1)
+        #now get the associated TICV file
+        ss_dir = ses_deriv/("T1_synthstrip{}{}".format(acq,run))/("post")/("FinalResult")
+        if not acq == '':
+            acq = '_'+acq
+        if not run == '':
+            run = '_'+run
+        if not ses == '':
+            ses = '_'+ses
+        ss_file = ss_dir/("{}{}{}{}_synthstrip_T1w.nii.gz".format(sub,ses,acq,run))
+        #TICV_seg = TICV_dir/("{}{}{}{}_T1w_seg.nii.gz".format(sub,ses,acq,run))
+        #print(TICV_seg)
+        if not ss_file.exists():
+            return None
+        return ss_file
+
     def get_BIDS_acq_run_from_PQdir(self, PQdir):
         """
         Given a PreQual directory, return the acq, run BIDS fields 
@@ -1804,6 +1826,7 @@ class PreQualGenerator(ScriptGenerator):
                             self.add_to_missing(sub, ses, acq, run, 'T1_missing')
                             continue
                         #if you want to run with the T1 stripped
+                        assert not (self.setup.args.skull_stripped and self.setup.args.use_synthstrip), "Cannot use both skull-stripped T1 and synthstrip at the same time. Select only one option"
                         if self.setup.args.skull_stripped:
                             #also must find the corresponding SLANT segmentaion
                             #based on the T1, get the TICV/UNest segmentation
@@ -1815,6 +1838,14 @@ class PreQualGenerator(ScriptGenerator):
                             if not seg or not seg.exists():
                                 self.add_to_missing(sub, ses, acq, run, 'TICV' if not self.setup.args.use_unest_seg else 'UNest')
                                 continue
+                        #if you want to run with the T1 skull stripped, but using synthstrip instead of SLANT-TICV
+                        if self.setup.args.use_synthstrip:
+                            ses_deriv = pqdir.parent
+                            seg = self.get_synthstrip_file(t1, ses_deriv)
+                            if not seg or not seg.exists():
+                                self.add_to_missing(sub, ses, acq, run, 'Synthstrip')
+                                continue
+
 
                     self.count += 1 #we should have everything, so we can generate the script
                     self.warnings[self.count] = ''
@@ -1827,7 +1858,7 @@ class PreQualGenerator(ScriptGenerator):
                     (session_input, session_output) = self.make_session_dirs(sub, ses, acq, run, tmp_input_dir=self.setup.tmp_input_dir,
                                             tmp_output_dir=self.setup.tmp_output_dir)
                     #setup the inputs dicitonary
-                    if self.setup.args.skull_stripped:
+                    if self.setup.args.skull_stripped or self.setup.args.use_synthstrip:
                         self.inputs_dict[self.count] = {'dwi': need_dwis[dir_num], 'bval': need_bvals[dir_num],
                                                     'bvec': need_bvecs[dir_num], 't1': {'src_path':t1, 'targ_name': 't1.nii.gz'},
                                                     'seg': {'src_path':seg, 'targ_name': 'seg.nii.gz'}}
@@ -1876,6 +1907,7 @@ class PreQualGenerator(ScriptGenerator):
                             continue
                         #check to see if you need it to be skull-stripped
                         #if you want to run with the T1 stripped
+                        assert not (self.setup.args.skull_stripped and self.setup.args.use_synthstrip), "Cannot use both skull-stripped T1 and synthstrip at the same time. Select only one option"
                         if self.setup.args.skull_stripped:
                             #also must find the corresponding SLANT segmentaion
                             #based on the T1, get the TICV/UNest segmentation
@@ -1887,6 +1919,13 @@ class PreQualGenerator(ScriptGenerator):
                             if not seg or not seg.exists():
                                 self.add_to_missing(sub, ses, acq, run, 'TICV' if not self.setup.args.use_unest_seg else 'UNest')
                                 continue
+                        if self.setup.args.use_synthstrip:
+                            ses_deriv = pqdir.parent
+                            seg = self.get_synthstrip_file(t1, ses_deriv)
+                            if not seg or not seg.exists():
+                                self.add_to_missing(sub, ses, acq, run, 'Synthstrip')
+                                continue
+
                     #otherwise, continue as normal
                     self.count += 1 #we should have everything, so we can generate the script
                     self.warnings[self.count] = ''
