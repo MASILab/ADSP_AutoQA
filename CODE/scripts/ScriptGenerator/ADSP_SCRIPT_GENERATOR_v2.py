@@ -81,6 +81,7 @@ def pa():
     p.add_argument('--force_no_topup', action='store_true', help="If you want to force not running topup for PreQual (only advised if you have already preprocessed the data and run TOPUP/susceptibility distortion correction)")
     p.add_argument('--set_neg_age_to_zero', action='store_true', help="If you want to set the negative ages to zero for the infantFS pipeline")
     p.add_argument('--use_synthstrip', action='store_true', help="If you want to use SynthStrip for PreQual instead of UNest/TICV")
+    p.add_argument("--scp_max_wait_time", type=int, default=600, help="Maximum time to add for scp/ssh commands so that servers are not over-throttled.")
     return p.parse_args()
 
 class ScriptGeneratorSetup:
@@ -1328,6 +1329,7 @@ class ScriptGenerator:
             Writes the line to copy the input to the session_input dir
             """
             if not self.setup.args.no_scp:
+                #TODO: create a wait time for the scp command to ensure that it does not over throttle the server
                 script.write("scp -r {}@{}:{} {}\n".format(self.setup.vunetID, self.setup.args.src_server, input, targ_name))
             else:
                 script.write("cp -rL {} {}\n".format(input, targ_name))
@@ -1338,6 +1340,7 @@ class ScriptGenerator:
             """
             if not 'special_copy' in kwargs:
                 if not self.setup.args.no_scp:
+                    #TODO: create a wait time for the scp command to ensure that it does not over throttle the server
                     script.write("scp -r {}/* {}@{}:{}/\n".format(session_output, self.setup.vunetID, self.setup.args.src_server, deriv_output))
                 else:
                     script.write("cp -r {}/* {}/\n".format(session_output, deriv_output))
@@ -1345,6 +1348,7 @@ class ScriptGenerator:
                 #do not just copy back all outputs, but only the necessary ones
                 for targ_copy in kwargs['special_copy']:
                     if not self.setup.args.no_scp:
+                        #TODO: create a wait time for the scp command to ensure that it does not over throttle the server
                         script.write("scp -r {} {}@{}:{}/\n".format(session_output/targ_copy, self.setup.vunetID, self.setup.args.src_server, deriv_output))
                     else:
                         script.write("cp -r {} {}/\n".format(session_output/targ_copy, deriv_output))
@@ -1360,6 +1364,7 @@ class ScriptGenerator:
             """
 
             if not self.setup.args.no_scp:
+                #TODO: create a wait time for the scp command to ensure that it does not over throttle the server
                 script.write("local_md5=$(md5sum {} | cut -d ' ' -f 1)\nremote_md5=$(ssh {}@{} \"md5sum {} | cut -d ' ' -f 1\")\nif [ \"$local_md5\" != \"$remote_md5\" ]; then echo \"PROVENANCE FAIL: Files {} and {} do not match\"; exit 1; else echo Files {} and {} match; fi\n".format(targ_name, self.setup.vunetID, self.setup.args.src_server, input, input, targ_name, input, targ_name))
             else:
                 script.write("local_md5=$(md5sum {} | cut -d ' ' -f 1)\nremote_md5=$(md5sum {} | cut -d ' ' -f 1)\nif [ \"$local_md5\" != \"$remote_md5\" ]; then echo \"PROVENANCE FAIL: Files {} and {} do not match\"; exit 1; else echo Files {} and {} match; fi\n".format(targ_name, input, input, targ_name, input, targ_name))
@@ -1376,6 +1381,7 @@ class ScriptGenerator:
 
             #this will get the mdm5sum of all the files in the source directory
             if not self.setup.args.no_scp: #another /* here?
+                #TODO: create a wait time for the scp command to ensure that it does not over throttle the server
                 content="src_dir={output_dir}; declare -A remote_dict; while IFS= read -r line; do value=\"${{line%% *}}\"; key=\"${{line##* }}\"; key=$(echo $key | sed -E \"s|${{src_dir}}||g\"); remote_dict[\"$key\"]=\"$value\"; done < <(ssh {ID}@{server} \"find ${{src_dir}} \( -type f -o -type l \) -exec md5sum {{}} +\")\n".format(ID=self.setup.vunetID, server=self.setup.args.src_server, output_dir=str(targ_dir)+'/')
                 script.write(content)
             else:
@@ -1421,15 +1427,22 @@ class ScriptGenerator:
         with open(script_f, 'w') as script:
             #write the header
             script.write("#!/bin/bash\n")
+
+            #TODO: get the waiting time between scp and ssh commands
+            #get a random number between 0 and self.args.scp_max_wait_time
+            script.write("MINWAIT=0\n")
+            script.write("MAXWAIT={}\n".format(self.setup.args.scp_max_wait_time))
+            script.write("sleep $((MINWAIT+RANDOM % (MAXWAIT-MINWAIT)))\n\n")
+
             #here, make any additional directories that we would need to copy into (like for connectome special)
             if 'input_dirs' in kwargs:
                 script.write("echo Creating additional input directories...\n")
                 for inp_dir in kwargs['input_dirs']:
                     script.write('mkdir -p {}/{}\n'.format(session_input, inp_dir))
-            if 'tractseg_setup' in kwargs:
-                script.write("MINWAIT=0\n")
-                script.write("MAXWAIT=60\n")
-                script.write("sleep $((MINWAIT+RANDOM % (MAXWAIT-MINWAIT)))\n\n")
+            # if 'tractseg_setup' in kwargs:
+            #     script.write("MINWAIT=0\n")
+            #     script.write("MAXWAIT=60\n")
+            #     script.write("sleep $((MINWAIT+RANDOM % (MAXWAIT-MINWAIT)))\n\n")
             script.write("echo Copying inputs to local storage...\n")
             #copy over the inputs
             #check the provenance of the inputs right afterwards as well
