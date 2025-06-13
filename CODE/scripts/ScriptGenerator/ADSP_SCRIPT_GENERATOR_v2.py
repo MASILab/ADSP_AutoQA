@@ -2077,6 +2077,8 @@ class SLANT_TICVGenerator(ScriptGenerator):
         script.write("echo Finished running SLANT-TICV. Now removing pre and dl directories...\n")
         script.write("rm -r {}/*\n".format(kwargs['pre']))
         script.write("rm -r {}/*\n".format(kwargs['dl']))
+        #remove the files in the post direcotry as well except for the seg
+        script.write("find {} -mindepth 1 -maxdepth 1 ! -type f -exec rm -rf {{}} +\n".format(kwargs['post']))
         #removing matlab cache files
         script.write("rm -rf {}/.mcrCache9.11\n".format(session_input))
         script.write("rm -rf {}/.matlab\n".format(session_input))
