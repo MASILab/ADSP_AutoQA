@@ -2775,7 +2775,7 @@ class ConnectomeSpecialGenerator(ScriptGenerator):
                 seg = self.get_TICV_seg_file(t1, ses_deriv)
             else:
                 seg = self.get_UNest_seg_file(t1, ses_deriv)
-            if not seg.exists():
+            if seg is None or not seg.exists():
                 self.add_to_missing(sub, ses, acq, run, 'TICV' if not self.setup.args.use_unest_seg else 'UNest')
                 continue
 
