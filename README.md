@@ -3,6 +3,16 @@ Automated QA for ADSP processing.
 Written by Michael Kim. 
 Email: michael.kim@vanderbilt.edu
 
+## Citation
+
+If you use this for your research, please cite the following paper:
+
+Kim, Michael E., et al. "Scalable quality control on processing of large diffusion-weighted and structural magnetic resonance imaging datasets." PLOS One (2025). (Accepted)
+
+## BIDS-Agnostic Version
+
+If your data are not appropriate to be organized into BIDS format, please use the version of this tool that is BIDS-Agnostic: https://github.com/MASILab/GeneralQATool.git
+
 ## NOTES FOR USE:
 - The app runs WAYYY faster and smoother when using chrome as the web browser. Firefox is very slow and jittery.
 - *DO NOT have multiple people simultaneuosly QAing the same dataset/pipeline: the CSV is only read in when starting the app, new updates are not detected utill the app is run again.*
