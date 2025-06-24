@@ -130,6 +130,7 @@ class ScriptGeneratorSetup:
             "rawEVE3WMAtlas": RawEVE3WMAtlasGenerator,
             "infantFS": InfantFreesurferGenerator,
             "BRAID": BRAIDGenerator,
+            "SeeleyFMRIPreprocv5.1": SeeleyFMRIPreprocv51Generator,
 
             ##TODO: add the other pipelines
 
@@ -262,6 +263,7 @@ class ScriptGeneratorSetup:
                         'rawEVE3WMAtlas': wmatlas_simg,
                         "infantFS" : "/nobackup/p_masi/Singularities/infantfs_v0.0.sif",
                         "BRAID": "/nobackup/p_masi/Singularities/braid_v1.0.0.sif",
+                        "SeeleyFMRIPreprocv5.1": "/nobackup/p_masi/Singularities/Seeleyfmripreproc_v5.1.simg"
                     }
             simg = mapping[self.args.pipeline]
         except:
@@ -547,6 +549,13 @@ class ScriptGenerator:
         pass
         #raise NotImplementedError("Error: braid_script_generate not implemented")
 
+    def seeley_fmri_preproc_v51_script_generate(self):
+        """
+        Abstract method to be implemented by the child class
+        """
+        pass
+        #raise NotImplementedError("Error: seeley_fmri_preproc_v51_script_generate not implemented")
+
     ## END ABSTRACT CLASSES ##
 
     def __init__(self, setup_object):
@@ -583,6 +592,7 @@ class ScriptGenerator:
             "rawEVE3WMAtlas": self.rawEVE3Registration_script_generate,
             "infantFS": self.infant_freesurfer_script_generate,
             "BRAID": self.braid_script_generate,
+            "SeeleyFMRIPreprocv5.1": self.seeley_fmri_preproc_v51_script_generate
         }
 
         self.necessary_outputs = {
@@ -643,7 +653,8 @@ class ScriptGenerator:
             'FreesurferWhiteMatterMask': [],
             'rawEVE3WMAtlas': [],
             'infantFS': [],
-            'BRAID': []
+            'BRAID': [],
+            'SeeleyFMRIPreprocv5.1': []
             ### TODO: add the necessary outputs for the other pipelines
                 #this cannot be static for all the outputs for all pipelines, only some of them
         }
@@ -766,6 +777,24 @@ class ScriptGenerator:
                 PQdirs.append(PQdir)
             return PQdirs
     
+    def get_rest_fmri_files(self):
+        """
+        Returns a list of fmri files that are in the dataset
+        """
+        if self.setup.args.select_sessions_list == '':
+            print("Finding all Resting State FMRIs...")
+            find_cmd = "find {} -mindepth 3 -maxdepth 4 \( -type f -o -type l \) -name '*task-rest_bold.nii.gz' | grep -v derivatives".format(str(self.setup.root_dataset_path))
+            result = subprocess.run(find_cmd, shell=True, capture_output=True, text=True).stdout
+            files = result.strip().splitlines()
+        else:
+            lst_path = Path(self.setup.args.select_sessions_list)
+            assert lst_path.exists(), "Error: select_sessions_list file {} that was specified does not exist".format(str(lst_path))
+            print("Finding all resting state FMRIs from select_sessions_list {}...".format(str(lst_path)))
+            with open(lst_path, 'r') as f:
+                files = f.readlines()
+            files = [x.strip() for x in files]
+        return files
+
     def get_BIDS_fields_dwi(self, dwi_path):
         """
         Return the BIDS tags for a dwi scan
@@ -779,6 +808,12 @@ class ScriptGenerator:
     def get_BIDS_fields_t1(self, t1_path):
         pattern = r'(sub-\w+)(?:_(ses-\w+))?(?:_(acq-\w+))?(?:_(run-\d{1,3}))?_T1w'
         matches = re.findall(pattern, str(t1_path).split('/')[-1])
+        sub, ses, acq, run = matches[0][0], matches[0][1], matches[0][2], matches[0][3]
+        return sub, ses, acq, run
+
+    def get_BIDS_fields_RS_fmri(self, rs_fmri_path):
+        pattern = r'(sub-\w+)(?:_(ses-\w+))?(?:_(acq-\w+))?(?:_(run-\d{1,3}))?_task-rest_bold'
+        matches = re.findall(pattern, str(rs_fmri_path).split('/')[-1])
         sub, ses, acq, run = matches[0][0], matches[0][1], matches[0][2], matches[0][3]
         return sub, ses, acq, run
 
@@ -969,6 +1004,17 @@ class ScriptGenerator:
             return False
         return True
 
+    def has_SeeleyFMRIPreprocv51_outputs(self, seeley_dir, ses_flag):
+        """
+        Returns True if the SeeleyFMRIPreprocv5.1 outputs exist
+        """
+
+        #check to see if the remeaned file exists
+        remeaned_file = seeley_dir/"PREPROCESSED"/f"s_remeaned_filreg_w_ms_slnt_cad{ses_flag}_REST.nii.gz"
+        if not remeaned_file.exists():
+            return False
+        return True
+
     def get_t1(self, path, sub, ses):
         #given a path to the anat folder, returns a T1 if it exists
         t1s = [x for x in path.glob('*') if re.match("^.*T1w\.nii\.gz$", x.name)]
@@ -1008,6 +1054,22 @@ class ScriptGenerator:
         for type in [mpr, spgr, flair, tfe, se, unknown]:
             if type.exists():
                 return type
+        #if we have gotten here, return the first T1 that we find
+        print("Using {} for {}_{}".format(t1s[0], sub, ses))
+        return t1s[0]
+
+    def get_t2(self, path, sub, ses):
+        #given a path to the anat folder, returns a T2 if it exists
+        t1s = [x for x in path.glob('*') if re.match("^.*T2w\.nii\.gz$", x.name)]
+        #if there is only a single T1, return that
+        if len(t1s) == 1:
+            return t1s[0]
+        if len(t1s) == 0:
+            print("echo ERROR: {}_{} does not have a valid run1 T1".format(sub, ses))
+            return None
+        ####
+        sesx = '_'+ses if ses != '' else ''
+        ####
         #if we have gotten here, return the first T1 that we find
         print("Using {} for {}_{}".format(t1s[0], sub, ses))
         return t1s[0]
@@ -4285,6 +4347,95 @@ class InfantFreesurferGenerator(ScriptGenerator):
                 #start the script generation
                 self.start_script_generation(session_input, session_output, deriv_output_dir=infant_fs_target, age=age)
 
+#Seeley FMRI Preprocessing v5.1 for resting state FMRI (no task)
+class SeeleyFMRIPreprocv51Generator(ScriptGenerator):
+
+    def __init__(self, setup_object):
+        """
+        Class for running Seeley FMRI Preprocessing v5.1
+        """
+        super().__init__(setup_object=setup_object)
+        #self.warnings = {}
+        self.outputs = {}
+        self.inputs_dict = {}
+
+        self.seeleyFMRIPreprocv51_script_generate()
+
+    def seeley_fmri_preproc_v51_script_generate(self, script, session_input, session_output, **kwargs):
+        
+        script.write("echo Running Seeley FMRI Preprocessing v5.1...\n")
+        script.write(f"singularity run -e --contain -B {session_input}:/dev/shm -B /tmp:/tmp --home {session_input} -B {session_input}/{kwargs['seeley_fmri']}:/INPUTS/{kwargs['seeley_fmri']} -B {session_input}/{kwargs['seeley_t1']}:/INPUTS/{kwargs['seeley_t1']} -B {session_input}/{kwargs['seeley_t2']}:/INPUTS/{kwargs['seeley_t2']} -B {session_input}/{kwargs['seeley_seg']}:/INPUTS/{kwargs['seeley_seg']} -B {session_output}:/OUTPUTS {self.setup.simg} --proj {kwargs['seeley_proj']} --subj {kwargs['seeley_subj']} --sess {kwargs['seeley_subj']} /INPUTS /OUTPUTS\n")
+        script.write("echo Done running Seeley FMRI Preprocessing v5.1. Now removing inputs and copying outputs back...\n")
+
+    def seeleyFMRIPreprocv51_script_generate(self):
+
+        #function that gets the resting state fMRI files
+        fmri_files = self.get_rest_fmri_files()
+
+        #iterate through the resting state fMRI files
+        for fmri_p in tqdm(fmri_files):
+            #get the BIDS tags for the fMRI file
+            sub, ses, acq, run = self.get_BIDS_fields_RS_fmri(fmri_p)
+
+            #get the sess tag for the output naming
+            ses_tag = f"{sub}_{ses}_{acq}_{run}"
+
+            #check to see if the SeeleyFMRIPreprocv5.1 outputs already exist
+            seeleydir = self.setup.dataset_derivs/(sub)/(ses)/("SeeleyFMRIPreprocv5.1{}{}".format(acq, run))
+            if self.has_SeeleyFMRIPreprocv51_outputs(seeleydir, ses_tag):
+                continue
+
+            #check to see if a T1 exists
+            fmri_dir = Path(fmri_p).parent
+            t1 = self.get_t1(fmri_dir.parent/("anat"), sub, ses)
+            if not t1:
+                self.add_to_missing(sub, ses, acq, run, 'T1_missing')
+                continue
+
+            #check to see if a T2 exists
+            t2 = self.get_t2(fmri_dir.parent/("anat"), sub, ses)
+            if not t2:
+                self.add_to_missing(sub, ses, acq, run, 'T2_missing')
+                continue
+
+            #check to see if a SLANT Output exists
+            #based on the T1, get the TICV/UNest segmentation
+            ses_deriv = seeleydir.parent
+            if not self.setup.args.use_unest_seg:
+                seg = self.get_TICV_seg_file(t1, ses_deriv)
+            else:
+                seg = self.get_UNest_seg_file(t1, ses_deriv)
+            if not seg.exists():
+                self.add_to_missing(sub, ses, acq, run, 'TICV' if not self.setup.args.use_unest_seg else 'UNest')
+                continue
+
+            self.count += 1
+
+            #setup the temp directories
+            (session_input, session_output) = self.make_session_dirs(sub, ses, acq, run, tmp_input_dir=self.setup.tmp_input_dir,
+                                            tmp_output_dir=self.setup.tmp_output_dir)
+
+            #create the output target directory
+            seeley_target = self.setup.output_dir/(sub)/(ses)/("SeeleyFMRIPreprocv5.1{}{}".format(acq, run))
+            if not seeley_target.exists():
+                os.makedirs(seeley_target)
+
+            #setup the inputs dictionary and outputs list
+            proj = self.setup.args.dataset_name
+            subj = "BLSA"
+            seeley_t1 = f'{subj}_MPRAGE.nii.gz'
+            seeley_t2 = f'{subj}_T2.nii.gz'
+            seeley_fmri = f'{subj}_REST.nii.gz'
+            seeley_seg = f'{subj}_T1_seg_slant.nii.gz'
+            self.inputs_dict[self.count] = {'t1': {'src_path': t1, 'targ_name': seeley_t1},
+                                            'seg': {'src_path': seg, 'targ_name': seeley_seg},
+                                            't2': {'src_path': t2, 'targ_name': seeley_t2},
+                                            'fmri': {'src_path': fmri_p, 'targ_name': seeley_fmri}
+                                        }
+            self.outputs[self.count] = []
+
+            #start the script generation
+            self.start_script_generation(session_input, session_output, deriv_output_dir=seeley_target, seeley_t1=seeley_t1, seeley_t2=seeley_t2, seeley_fmri=seeley_fmri, seeley_seg=seeley_seg, seeley_subj=subj, seeley_proj=proj)
 
 #for Kurt: run scilpy scipts on tractseg dirs
 class Scilpy_on_TractsegGenerator(ScriptGenerator):
