@@ -1074,6 +1074,27 @@ class ScriptGenerator:
         print("Using {} for {}_{}".format(t1s[0], sub, ses))
         return t1s[0]
 
+    def get_BLSA_legacy_session_info(self, sub, ses):
+        """
+        ONLY FOR BLSA
+
+        Get the BLSA_XXXX_XX-X_XX session info from the subject and session strings
+        """
+
+        blsa_sub = sub.split('-')[1]  # BLSA_XXXX
+        blsa_sub = blsa_sub[:4] + '_' + blsa_sub[4:]
+
+        blsa_ses = ses.split('-')[1]  # XX-X_XX
+        blsa_scanner = blsa_ses.split('scanner')[1]
+        blsa_ses = blsa_ses[:2] + '-' + blsa_ses[2:3] + '_' + blsa_scanner
+
+        #combine
+        blsa_session = f"{blsa_sub}_{blsa_ses}"
+        return blsa_session
+
+
+        #ses-060scanner10
+
     #create a function
     def get_braid_json_input(self, demogs, sub, ses):
         """
@@ -4369,6 +4390,8 @@ class SeeleyFMRIPreprocv51Generator(ScriptGenerator):
 
     def seeleyFMRIPreprocv51_script_generate(self):
 
+        assert self.setup.args.dataset_name == 'BLSA', "Error: SeeleyFMRIPreprocv5.1 is only supported for BLSA dataset"
+
         #function that gets the resting state fMRI files
         fmri_files = self.get_rest_fmri_files()
 
@@ -4411,6 +4434,10 @@ class SeeleyFMRIPreprocv51Generator(ScriptGenerator):
 
             self.count += 1
 
+            #get the BLSA legacy session
+            legacy = self.get_BLSA_legacy_session_info(sub, ses)
+            legacy += "-"
+
             #setup the temp directories
             (session_input, session_output) = self.make_session_dirs(sub, ses, acq, run, tmp_input_dir=self.setup.tmp_input_dir,
                                             tmp_output_dir=self.setup.tmp_output_dir)
@@ -4423,10 +4450,10 @@ class SeeleyFMRIPreprocv51Generator(ScriptGenerator):
             #setup the inputs dictionary and outputs list
             proj = self.setup.args.dataset_name
             subj = "BLSA"
-            seeley_t1 = f'{subj}_MPRAGE.nii.gz'
-            seeley_t2 = f'{subj}_T2.nii.gz'
-            seeley_fmri = f'{subj}_REST.nii.gz'
-            seeley_seg = f'{subj}_T1_seg_slant.nii.gz'
+            seeley_t1 = f'{legacy}_MPRAGE.nii.gz'
+            seeley_t2 = f'{legacy}_T2.nii.gz'
+            seeley_fmri = f'{legacy}_REST.nii.gz'
+            seeley_seg = f'{legacy}_T1_seg_slant.nii.gz'
             self.inputs_dict[self.count] = {'t1': {'src_path': t1, 'targ_name': seeley_t1},
                                             'seg': {'src_path': seg, 'targ_name': seeley_seg},
                                             't2': {'src_path': t2, 'targ_name': seeley_t2},
@@ -4435,7 +4462,7 @@ class SeeleyFMRIPreprocv51Generator(ScriptGenerator):
             self.outputs[self.count] = []
 
             #start the script generation
-            self.start_script_generation(session_input, session_output, deriv_output_dir=seeley_target, seeley_t1=seeley_t1, seeley_t2=seeley_t2, seeley_fmri=seeley_fmri, seeley_seg=seeley_seg, seeley_subj=subj, seeley_proj=proj)
+            self.start_script_generation(session_input, session_output, deriv_output_dir=seeley_target, seeley_t1=seeley_t1, seeley_t2=seeley_t2, seeley_fmri=seeley_fmri, seeley_seg=seeley_seg, seeley_subj=legacy, seeley_proj=proj)
 
 #for Kurt: run scilpy scipts on tractseg dirs
 class Scilpy_on_TractsegGenerator(ScriptGenerator):
