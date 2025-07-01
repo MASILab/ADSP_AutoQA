@@ -2203,7 +2203,7 @@ class SLANT_TICVGenerator(ScriptGenerator):
         script.write("rm -r {}/*\n".format(kwargs['pre']))
         script.write("rm -r {}/*\n".format(kwargs['dl']))
         #remove the files in the post direcotry as well except for the seg
-        script.write("find {} -mindepth 1 -maxdepth 1 ! -type f -exec rm -rf {{}} +\n".format(kwargs['post']))
+        script.write("find {} -mindepth 2 -maxdepth 2 ! -type f -exec rm -rf {{}} +\n".format(kwargs['post']))
         #removing matlab cache files
         script.write("rm -rf {}/.mcrCache9.11\n".format(session_input))
         script.write("rm -rf {}/.matlab\n".format(session_input))
@@ -3046,7 +3046,7 @@ class TractsegGenerator(ScriptGenerator):
         #script.write("export FSL_DIR=/accre/arch/easybuild/software/MPI/GCC/6.4.0-2.28/OpenMPI/2.1.1/FSL/5.0.10/fsl\n")
         #script.write("source setup_accre_runtime_dir\n")
 
-        script.write("time singularity run -e --contain --home {} -B /tmp:/tmp -B {}:{} -B {}:{} {} TractSeg -i {}/dwmri_1mm_iso.nii.gz --raw_diffusion_input -o {}/tractseg --bvals {}/dwmri.bval --bvecs {}/dwmri.bvec\n".format(kwargs['temp_dir'], kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir']))
+        script.write("time singularity run -e --contain --home {} -B /tmp:/tmp -B {}:{} {} TractSeg -i {}/dwmri_1mm_iso.nii.gz --raw_diffusion_input -o {}/tractseg --bvals {}/dwmri.bval --bvecs {}/dwmri.bvec\n".format(kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir']))
         script.write('if [[ -f "{}/tractseg/peaks.nii.gz" ]]; then echo "Successfully created peaks.nii.gz for {}"; error_flag=0; else echo "Improper bvalue/bvector distribution for {}"; error_flag=1; fi\n'.format(kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir']))
         script.write('if [[ $error_flag -eq 1 ]]; then echo "Improper bvalue/bvector distribution for {}" >> {}/report_bad_bvector.txt; fi\n\n'.format(kwargs['temp_dir'], kwargs['temp_dir']))        
 
@@ -3055,9 +3055,9 @@ class TractsegGenerator(ScriptGenerator):
         script.write("exit 1\n")
         script.write("fi\n\n")
 
-        script.write("time singularity run -e --contain --home {} -B /tmp:/tmp -B {}:{} -B {}:{} {} TractSeg -i {}/tractseg/peaks.nii.gz -o {}/tractseg --output_type endings_segmentation\n".format(kwargs['temp_dir'], kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, kwargs['temp_dir'], kwargs['temp_dir']))
-        script.write("time singularity run -e --contain --home {} -B /tmp:/tmp -B {}:{} -B {}:{} {} TractSeg -i {}/tractseg/peaks.nii.gz -o {}/tractseg --output_type TOM\n".format(kwargs['temp_dir'], kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, kwargs['temp_dir'], kwargs['temp_dir']))
-        script.write("time singularity run -e --contain --home {} -B /tmp:/tmp -B {}:{} -B {}:{} {} Tracking -i {}/tractseg/peaks.nii.gz -o {}/tractseg --tracking_format tck\n".format(kwargs['temp_dir'], kwargs['accre_home'], kwargs['accre_home'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, kwargs['temp_dir'], kwargs['temp_dir']))
+        script.write("time singularity run -e --contain --home {} -B /tmp:/tmp -B {}:{} {} TractSeg -i {}/tractseg/peaks.nii.gz -o {}/tractseg --output_type endings_segmentation\n".format(kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, kwargs['temp_dir'], kwargs['temp_dir']))
+        script.write("time singularity run -e --contain --home {} -B /tmp:/tmp -B {}:{} {} TractSeg -i {}/tractseg/peaks.nii.gz -o {}/tractseg --output_type TOM\n".format(kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, kwargs['temp_dir'], kwargs['temp_dir']))
+        script.write("time singularity run -e --contain --home {} -B /tmp:/tmp -B {}:{} {} Tracking -i {}/tractseg/peaks.nii.gz -o {}/tractseg --tracking_format tck\n".format(kwargs['temp_dir'], kwargs['temp_dir'], kwargs['temp_dir'], ts_simg, kwargs['temp_dir'], kwargs['temp_dir']))
 
         script.write('echo "..............................................................................."\n')
         script.write("echo Done running TractSeg. Now computing measures per bundle...\n")
@@ -3101,16 +3101,17 @@ class TractsegGenerator(ScriptGenerator):
         root_temp = Path(self.setup.args.temp_dir)
         assert root_temp.exists() and os.access(root_temp, os.W_OK), "Error: Root temp directory {} does not exist or is not writable".format(root_temp)
 
-        #get the accre home directory / home directory for the tractseg inputs
-        if self.setup.args.no_accre:
-            if self.setup.args.custom_home != '':
-                accre_home_directory = self.setup.args.custom_home
-            else:
-                accre_home_directory = os.path.expanduser("~")
-                user = accre_home_directory.split('/')[-1]
-                accre_home_directory = "/home/local/VANDERBILT/{}/".format(user)
-        else:
-            accre_home_directory = os.path.expanduser("~")     
+        #get the accre home directory / home directory for the tractseg inputs --> moved to /WEIGHTS
+        # if self.setup.args.no_accre:
+        #     if self.setup.args.custom_home != '':
+        #         accre_home_directory = self.setup.args.custom_home
+        #     else:
+        #         #assert False, "should not be using accre home directory. Please set the custom home directory using --custom_home"
+        #         accre_home_directory = os.path.expanduser("~")
+        #         user = accre_home_directory.split('/')[-1]
+        #         accre_home_directory = "/home/local/VANDERBILT/{}/".format(user)
+        # else:
+        #     accre_home_directory = os.path.expanduser("~")     
         
         prequal_dirs = self.get_PreQual_dirs()
 
@@ -3176,7 +3177,7 @@ class TractsegGenerator(ScriptGenerator):
 
             #start the script generation
             self.start_script_generation(session_input, session_output, deriv_output_dir=tractseg_target, temp_dir=session_temp,
-                                        tractseg_setup=True, accre_home=accre_home_directory, temp_is_output=True)
+                                        tractseg_setup=True, temp_is_output=True)
    
 class FrancoisSpecialGenerator(ScriptGenerator):
     """
