@@ -4,6 +4,7 @@ Email: michael.kim@vanderbilt.edu
 June 2024
 """
 
+from numpy._core import fromnumeric
 import pandas as pd
 import argparse
 from pathlib import Path
@@ -35,7 +36,7 @@ def pa():
     """
 
     pipelines = ["PreQual", "SLANT-TICV", "freesurfer", "EVE3WMAtlas", "MNIWMAtlas",
-                'UNest', 'synthstrip', 'tractseg', 'MaCRUISE', 'ConnectomeSpecial', 'Biscuit', 'FrancoisSpecial']
+                'UNest', 'synthstrip', 'tractseg', 'MaCRUISE', 'ConnectomeSpecial', 'Biscuit', 'FrancoisSpecial', 'FMRIQAv4.0']
 
     p = argparse.ArgumentParser(description="Script generator for ADSP")
     p.add_argument('dataset_name', type=str, help="name of the dataset to run processing on in /nfs2/harmonization/BIDS/<dataset_name>")
@@ -131,6 +132,9 @@ class ScriptGeneratorSetup:
             "infantFS": InfantFreesurferGenerator,
             "BRAID": BRAIDGenerator,
             "SeeleyFMRIPreprocv5.1": SeeleyFMRIPreprocv51Generator,
+            "SeeleyFMRITaskPreproc_FP_v1.0": SeeleyFMRITaskFPv1Generator,
+            "FMRIQAv4.0": FMRIQAv4Generator,
+            
 
             ##TODO: add the other pipelines
 
@@ -263,7 +267,8 @@ class ScriptGeneratorSetup:
                         'rawEVE3WMAtlas': wmatlas_simg,
                         "infantFS" : "/nobackup/p_masi/Singularities/infantfs_v0.0.sif",
                         "BRAID": "/nobackup/p_masi/Singularities/braid_v1.0.0.sif",
-                        "SeeleyFMRIPreprocv5.1": "/nobackup/p_masi/Singularities/Seeleyfmripreproc_v5.1.simg"
+                        "SeeleyFMRIPreprocv5.1": "/nobackup/p_masi/Singularities/Seeleyfmripreproc_v5.1.simg",
+                        "FMRIQAv4.0": "/nobackup/p_masi/Singularities/FMRIQA_v4.0.0.simg"
                     }
             simg = mapping[self.args.pipeline]
         except:
@@ -556,6 +561,20 @@ class ScriptGenerator:
         pass
         #raise NotImplementedError("Error: seeley_fmri_preproc_v51_script_generate not implemented")
 
+    def seeley_fmri_task_fp_v1_script_generate(self):
+        """
+        Abstract method to be implemented by the child class
+        """
+        pass
+        #raise NotImplementedError("Error: seeley_fmri_task_fp_v1_script_generate not implemented")
+
+    def FMRIQAv4generate(self):
+        """
+        Abstract method to be implemented by the child class
+        """
+        pass
+        #raise NotImplementedError("Error: FMRIQAv4generate not implemented")
+
     ## END ABSTRACT CLASSES ##
 
     def __init__(self, setup_object):
@@ -592,7 +611,9 @@ class ScriptGenerator:
             "rawEVE3WMAtlas": self.rawEVE3Registration_script_generate,
             "infantFS": self.infant_freesurfer_script_generate,
             "BRAID": self.braid_script_generate,
-            "SeeleyFMRIPreprocv5.1": self.seeley_fmri_preproc_v51_script_generate
+            "SeeleyFMRIPreprocv5.1": self.seeley_fmri_preproc_v51_script_generate,
+            "SeeleyFMRITaskFPv1.0": self.seeley_fmri_task_fp_v1_script_generate,
+            "FMRIQAv4.0": self.fmriqa_v4_script_generate
         }
 
         self.necessary_outputs = {
@@ -654,8 +675,10 @@ class ScriptGenerator:
             'rawEVE3WMAtlas': [],
             'infantFS': [],
             'BRAID': [],
-            'SeeleyFMRIPreprocv5.1': []
-            ### TODO: add the necessary outputs for the other pipelines
+            'SeeleyFMRIPreprocv5.1': [],
+            'SeeleyFMRITaskFPv1.0': [],
+            'FMRIQAv4.0': []
+              ### TODO: add the necessary outputs for the other pipelines
                 #this cannot be static for all the outputs for all pipelines, only some of them
         }
 
@@ -665,7 +688,7 @@ class ScriptGenerator:
         """
         if self.setup.args.select_sessions_list == '':
             print("Finding all T1s...")
-            find_cmd = "find {} -mindepth 3 -maxdepth 4 \( -type f -o -type l \) -name '*T1w.nii.gz' | grep -v derivatives".format(str(self.setup.root_dataset_path))
+            find_cmd = "find {} -mindepth 3 -maxdepth 4 \\( -type f -o -type l \\) -name '*T1w.nii.gz' | grep -v derivatives".format(str(self.setup.root_dataset_path))
             result = subprocess.run(find_cmd, shell=True, capture_output=True, text=True).stdout
             files = result.strip().splitlines()
         else:
@@ -694,7 +717,7 @@ class ScriptGenerator:
         """
         if self.setup.args.select_sessions_list == '':
             print("Finding all DWIs...")
-            find_cmd = "find {} -mindepth 3 -maxdepth 4 \( -type f -o -type l \) -name '*dwi.nii.gz' | grep -v derivatives".format(str(self.setup.root_dataset_path))
+            find_cmd = "find {} -mindepth 3 -maxdepth 4 \\( -type f -o -type l \\) -name '*dwi.nii.gz' | grep -v derivatives".format(str(self.setup.root_dataset_path))
             result = subprocess.run(find_cmd, shell=True, capture_output=True, text=True).stdout
             files = result.strip().splitlines()
         else:
@@ -783,7 +806,8 @@ class ScriptGenerator:
         """
         if self.setup.args.select_sessions_list == '':
             print("Finding all Resting State FMRIs...")
-            find_cmd = "find {} -mindepth 3 -maxdepth 4 \( -type f -o -type l \) -name '*task-rest_bold.nii.gz' | grep -v derivatives".format(str(self.setup.root_dataset_path))
+            print("WAHHA", " ", self.setup.root_dataset_path)
+            find_cmd = "find {} -mindepth 3  \\( -type f -o -type l \\) -name '*task-rest_bold.nii.gz' | grep -v derivatives".format(str(self.setup.root_dataset_path))
             result = subprocess.run(find_cmd, shell=True, capture_output=True, text=True).stdout
             files = result.strip().splitlines()
         else:
@@ -795,6 +819,12 @@ class ScriptGenerator:
             files = [x.strip() for x in files]
         return files
 
+    def get_task_fmri_files(self):
+        """
+        Returns a list of fmri files that are in the dataset
+        """
+        raise NotImplementedError
+    
     def get_BIDS_fields_dwi(self, dwi_path):
         """
         Return the BIDS tags for a dwi scan
@@ -1015,10 +1045,22 @@ class ScriptGenerator:
             return False
         return True
 
+    def has_FMRIQAv4_outputs(self, fmriqa_dir, ses_flag):
+            """
+            Returns True if the FMRIQAv4.0 outputs exist
+            """
+
+            #check to see if the remeaned file exists
+            pdf_report = fmriqa_dir/"fmriqa_v4.pdf"
+            if not pdf_report.exists():
+                return False
+            return True
+
     def get_t1(self, path, sub, ses):
         #given a path to the anat folder, returns a T1 if it exists
-        t1s = [x for x in path.glob('*') if re.match("^.*T1w\.nii\.gz$", x.name)]
+        t1s = [x for x in path.glob('*') if re.match(r"^.*T1w\.nii\.gz$", x.name)]
         #if there is only a single T1, return that
+        print(path)
         if len(t1s) == 1:
             return t1s[0]
         if len(t1s) == 0:
@@ -4463,6 +4505,205 @@ class SeeleyFMRIPreprocv51Generator(ScriptGenerator):
 
             #start the script generation
             self.start_script_generation(session_input, session_output, deriv_output_dir=seeley_target, seeley_t1=seeley_t1, seeley_t2=seeley_t2, seeley_fmri=seeley_fmri, seeley_seg=seeley_seg, seeley_subj=legacy, seeley_proj=proj)
+
+
+class SeeleyFMRITaskFPv1Generator(ScriptGenerator):
+
+    def __init__(self, setup_object):
+        """
+        Class for running Seeley FMRI Task FP v1.0
+        """
+        super().__init__(setup_object=setup_object)
+        #self.warnings = {}
+        self.outputs = {}
+        self.inputs_dict = {}
+
+        self.seeleyFMRITaskFPv1_script_generate()
+
+    def seeley_fmri_task_fp_v1_script_generate(self, script, session_input, session_output, **kwargs):
+        
+        script.write("echo Running Seeley FMRI Preprocessing v5.1...\n")
+        """
+        script.write(f"singularity run -e --contain -B {session_input}:/dev/shm -B /tmp:/tmp --home {session_input} -B {session_input}/{kwargs['seeley_fmri']}:/INPUTS/{kwargs['seeley_fmri']} -B {session_input}/{kwargs['seeley_t1']}:/INPUTS/{kwargs['seeley_t1']} -B {session_input}/{kwargs['seeley_t2']}:/INPUTS/{kwargs['seeley_t2']} -B {session_input}/{kwargs['seeley_seg']}:/INPUTS/{kwargs['seeley_seg']} -B {session_output}:/OUTPUTS {self.setup.simg} --proj {kwargs['seeley_proj']} --subj {kwargs['seeley_subj']} --sess {kwargs['seeley_subj']} /INPUTS /OUTPUTS\n")
+        """
+        script.write(f"singularity run --contain --cleanenv --bind {session_input}:/dev/shm --bind /tmp:/tmp --home {session_input} --bind {session_input}/{kwargs['seeley_fmri_run3']}:/INPUTS/{kwargs['seeley_fmri_run3']} --bind  {session_input}/{kwargs['seeley_fmri_run4']}:/INPUTS/{kwargs['seeley_fmri_run4']} --bind {session_input}/{kwargs['seeley_t1']}:/INPUTS/{kwargs['seeley_t1']} -B {session_input}/{kwargs['seeley_t2']}:/INPUTS/{kwargs['seeley_t2']} --bind {session_input}/{kwargs['seeley_seg']}:/INPUTS/{kwargs['seeley_seg']} --bind {session_output}:/OUTPUTS {self.setup.simg} --proj {kwargs['seeley_proj']} --subj {kwargs['seeley_subj']} --sess {kwargs['seeley_subj']} /INPUTS /OUTPUTS\n")
+        script.write("echo Done running Seeley FMRI Task FP v1.0. Now removing inputs and copying outputs back...\n")
+
+    def seeleyFMRITaskFPv1_script_generate(self):
+
+        assert self.setup.args.dataset_name == 'BLSA', "Error: SeeleyFMRITaskFPv1.0 is only supported for BLSA dataset"
+
+        #function that gets the resting state fMRI files
+        fmri_files = self.get_rest_fmri_files()
+
+        #iterate through the resting state fMRI files
+        for fmri_p in tqdm(fmri_files):
+            #get the BIDS tags for the fMRI file
+            sub, ses, acq, run = self.get_BIDS_fields_RS_fmri(fmri_p)
+
+            #get the sess tag for the output naming
+            ses_tag = f"{sub}_{ses}_{acq}_{run}"
+
+            #check to see if the SeeleyFMRIPreprocv5.1 outputs already exist
+            seeleydir = self.setup.dataset_derivs/(sub)/(ses)/("SeeleyFMRIPreprocv5.1{}{}".format(acq, run))
+            if self.has_SeeleyFMRIPreprocv51_outputs(seeleydir, ses_tag):
+                continue
+
+            #check to see if a T1 exists
+            fmri_dir = Path(fmri_p).parent
+            t1 = self.get_t1(fmri_dir.parent/("anat"), sub, ses)
+            if not t1:
+                self.add_to_missing(sub, ses, acq, run, 'T1_missing')
+                continue
+
+            #check to see if a T2 exists
+            t2 = self.get_t2(fmri_dir.parent/("anat"), sub, ses)
+            if not t2:
+                self.add_to_missing(sub, ses, acq, run, 'T2_missing')
+                continue
+
+            #check to see if a SLANT Output exists
+            #based on the T1, get the TICV/UNest segmentation
+            ses_deriv = seeleydir.parent
+            if not self.setup.args.use_unest_seg:
+                seg = self.get_TICV_seg_file(t1, ses_deriv)
+            else:
+                seg = self.get_UNest_seg_file(t1, ses_deriv)
+            if not seg.exists():
+                self.add_to_missing(sub, ses, acq, run, 'TICV' if not self.setup.args.use_unest_seg else 'UNest')
+                continue
+
+            self.count += 1
+
+            #get the BLSA legacy session
+            legacy = self.get_BLSA_legacy_session_info(sub, ses)
+            legacy += "-"
+
+            #setup the temp directories
+            (session_input, session_output) = self.make_session_dirs(sub, ses, acq, run, tmp_input_dir=self.setup.tmp_input_dir,
+                                            tmp_output_dir=self.setup.tmp_output_dir)
+
+            #create the output target directory
+            seeley_target = self.setup.output_dir/(sub)/(ses)/("SeeleyFMRIPreprocv5.1{}{}".format(acq, run))
+            if not seeley_target.exists():
+                os.makedirs(seeley_target)
+
+            #setup the inputs dictionary and outputs list
+            proj = self.setup.args.dataset_name
+            subj = "BLSA"
+            seeley_t1 = f'{legacy}_MPRAGE.nii.gz'
+            seeley_t2 = f'{legacy}_T2.nii.gz'
+            seeley_fmri = f'{legacy}_REST.nii.gz'
+            seeley_seg = f'{legacy}_T1_seg_slant.nii.gz'
+            self.inputs_dict[self.count] = {'t1': {'src_path': t1, 'targ_name': seeley_t1},
+                                            'seg': {'src_path': seg, 'targ_name': seeley_seg},
+                                            't2': {'src_path': t2, 'targ_name': seeley_t2},
+                                            'fmri': {'src_path': fmri_p, 'targ_name': seeley_fmri}
+                                        }
+            self.outputs[self.count] = []
+
+            #start the script generation
+            self.start_script_generation(session_input, session_output, deriv_output_dir=seeley_target, seeley_t1=seeley_t1, seeley_t2=seeley_t2, seeley_fmri=seeley_fmri, seeley_seg=seeley_seg, seeley_subj=legacy, seeley_proj=proj)
+
+
+
+class FMRIQAv4Generator(ScriptGenerator):
+
+    def __init__(self, setup_object):
+        """
+        Class for running FMRIQA v4.0
+        """
+        super().__init__(setup_object=setup_object)
+        #self.warnings = {}
+        self.outputs = {}
+        self.inputs_dict = {}
+
+        self.FMRIQAv4_script_generate()
+
+    def fmriqa_v4_script_generate(self, script, session_input, session_output, **kwargs):
+        
+        script.write("echo Running Seeley FMRI Preprocessing v5.1...\n")
+        script.write(f"singularity exec -e -c --bind {session_input}:/INPUTS --bind {session_output}:/OUTPUTS --env MCR_INHIBIT_CTF_LOCK=1 --bind /fs5/p_masi/schwat1/unrelated/R2016a:/usr/bin/matlab {self.setup.simg} /extra/./pipeline.sh \n")
+        script.write("echo Done running Seeley FMRI Preprocessing v5.1. Now removing inputs and copying outputs back...\n")
+
+    def FMRIQAv4_script_generate(self):
+
+        # assert self.setup.args.dataset_name == 'BLSA', "Error: SeeleyFMRIPreprocv5.1 is only supported for BLSA dataset"
+
+        #function that gets the resting state fMRI files
+        fmri_files = self.get_rest_fmri_files()
+
+        #iterate through the resting state fMRI files
+        for fmri_p in tqdm(fmri_files):
+            #get the BIDS tags for the fMRI file
+            sub, ses, acq, run = self.get_BIDS_fields_RS_fmri(fmri_p)
+
+            #get the sess tag for the output naming
+            ses_tag = f"{sub}_{ses}_{acq}_{run}"
+
+            conf_txt = f"project = {self.setup.args.dataset_name}\nsubject = {sub}\nsession = {ses_tag}\nscan = {run}"
+
+            #check to see if the SeeleyFMRIPreprocv5.1 outputs already exist
+            fmriqadir = self.setup.dataset_derivs/(sub)/(ses)/("FMRIQAv4.0{}{}".format(acq, run))
+            if self.has_FMRIQAv4_outputs(fmriqadir, ses_tag):
+                continue
+
+            #check to see if a T1 exists
+            fmri_dir = Path(fmri_p).parent
+            t1 = self.get_t1(fmri_dir.parent/("anat"), sub, ses)
+            if not t1:
+                self.add_to_missing(sub, ses, acq, run, 'T1_missing')
+                continue
+
+            #check to see if a SLANT Output exists
+            #based on the T1, get the TICV/UNest segmentation
+            ses_deriv = fmriqadir.parent
+            if not self.setup.args.use_unest_seg:
+                seg = self.get_TICV_seg_file(t1, ses_deriv)
+            else:
+                seg = self.get_UNest_seg_file(t1, ses_deriv)
+            if not seg.exists():
+                self.add_to_missing(sub, ses, acq, run, 'TICV' if not self.setup.args.use_unest_seg else 'UNest')
+                continue
+
+            self.count += 1
+
+            #get the BLSA legacy session
+            legacy = self.get_BLSA_legacy_session_info(sub, ses)
+            legacy += "-"
+
+            #setup the temp directories
+            (session_input, session_output) = self.make_session_dirs(sub, ses, acq, run, tmp_input_dir=self.setup.tmp_input_dir,
+                                            tmp_output_dir=self.setup.tmp_output_dir)
+
+
+            conf_name = f"{session_input}/conf"
+
+            with open(conf_name, "w") as confio:
+                confio.write(conf_txt)
+            print(f"wrote {conf_name} ")
+
+            #create the output target directory
+            fmriqa_target = self.setup.output_dir/(sub)/(ses)/("FMRIQAv4.0{}{}".format(acq, run))
+            if not fmriqa_target.exists():
+                os.makedirs(fmriqa_target)
+
+            #setup the inputs dictionary and outputs list
+            proj = self.setup.args.dataset_name
+            subj = "BLSA"
+            fmriqa_t1 = 'T1.nii.gz'
+            fmriqa_fmri = 'FMRI.nii.gz'
+            fmriqa_seg = 'orig_target_seg.nii.gz'
+            fmriqa_conf = 'FMRIQA.conf'
+            self.inputs_dict[self.count] = {'t1': {'src_path': t1, 'targ_name': fmriqa_t1},
+                                            'seg': {'src_path': seg, 'targ_name': fmriqa_seg},
+                                            'fmri': {'src_path': fmri_p, 'targ_name': fmriqa_fmri},
+                                            'config':{'src_path':conf_name, 'targ_name': fmriqa_conf}
+                                        }
+            self.outputs[self.count] = []
+
+            #start the script generation
+            self.start_script_generation(session_input, session_output, deriv_output_dir=fmriqa_target, fmriqa_t1=fmriqa_t1, fmriqa_fmri=fmriqa_fmri, fmriqa_seg=fmriqa_seg, fmriqa_conf=fmriqa_conf, fmriqa_subj=legacy, fmriqa_proj=proj)
 
 #for Kurt: run scilpy scipts on tractseg dirs
 class Scilpy_on_TractsegGenerator(ScriptGenerator):
