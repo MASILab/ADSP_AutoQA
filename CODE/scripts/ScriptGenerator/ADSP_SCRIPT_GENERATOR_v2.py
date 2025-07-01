@@ -4623,9 +4623,9 @@ class FMRIQAv4Generator(ScriptGenerator):
 
     def fmriqa_v4_script_generate(self, script, session_input, session_output, **kwargs):
         
-        script.write("echo Running Seeley FMRI Preprocessing v5.1...\n")
+        script.write("echo Running FMRIQA v4.0.0...\n")
         script.write(f"singularity exec -e -c --bind {session_input}:/INPUTS --bind {session_output}:/OUTPUTS --env MCR_INHIBIT_CTF_LOCK=1 --bind /fs5/p_masi/schwat1/unrelated/R2016a:/usr/bin/matlab {self.setup.simg} /extra/./pipeline.sh \n")
-        script.write("echo Done running Seeley FMRI Preprocessing v5.1. Now removing inputs and copying outputs back...\n")
+        script.write("echo Done running FMRIQA v4.0.0 Now removing inputs and copying outputs back...\n")
 
     def FMRIQAv4_script_generate(self):
 
