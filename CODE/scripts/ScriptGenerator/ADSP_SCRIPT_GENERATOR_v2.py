@@ -131,6 +131,7 @@ class ScriptGeneratorSetup:
             "infantFS": InfantFreesurferGenerator,
             "BRAID": BRAIDGenerator,
             "SeeleyFMRIPreprocv5.1": SeeleyFMRIPreprocv51Generator,
+            "FMRIprep": FMRIprepGenerator,
 
             ##TODO: add the other pipelines
 
@@ -263,7 +264,8 @@ class ScriptGeneratorSetup:
                         'rawEVE3WMAtlas': wmatlas_simg,
                         "infantFS" : "/nobackup/p_masi/Singularities/infantfs_v0.0.sif",
                         "BRAID": "/nobackup/p_masi/Singularities/braid_v1.0.0.sif",
-                        "SeeleyFMRIPreprocv5.1": "/nobackup/p_masi/Singularities/Seeleyfmripreproc_v5.1.simg"
+                        "SeeleyFMRIPreprocv5.1": "/nobackup/p_masi/Singularities/Seeleyfmripreproc_v5.1.simg",
+                        "FMRIprep": "/nobackup/p_masi/Singularities/fmriprep_25.1.3.sif",
                     }
             simg = mapping[self.args.pipeline]
         except:
@@ -555,6 +557,13 @@ class ScriptGenerator:
         """
         pass
         #raise NotImplementedError("Error: seeley_fmri_preproc_v51_script_generate not implemented")
+    
+    def fmri_prep_script_generate(self):
+        """
+        Abstract method to be implemented by the child class
+        """
+        pass
+        #raise NotImplementedError("Error: fmri_prep_script_generate not implemented")
 
     ## END ABSTRACT CLASSES ##
 
@@ -592,7 +601,8 @@ class ScriptGenerator:
             "rawEVE3WMAtlas": self.rawEVE3Registration_script_generate,
             "infantFS": self.infant_freesurfer_script_generate,
             "BRAID": self.braid_script_generate,
-            "SeeleyFMRIPreprocv5.1": self.seeley_fmri_preproc_v51_script_generate
+            "SeeleyFMRIPreprocv5.1": self.seeley_fmri_preproc_v51_script_generate,
+            "FMRIprep": self.fmri_prep_script_generate
         }
 
         self.necessary_outputs = {
@@ -654,7 +664,8 @@ class ScriptGenerator:
             'rawEVE3WMAtlas': [],
             'infantFS': [],
             'BRAID': [],
-            'SeeleyFMRIPreprocv5.1': []
+            'SeeleyFMRIPreprocv5.1': [],
+            'FMRIprep': []
             ### TODO: add the necessary outputs for the other pipelines
                 #this cannot be static for all the outputs for all pipelines, only some of them
         }
@@ -795,6 +806,24 @@ class ScriptGenerator:
             files = [x.strip() for x in files]
         return files
 
+    def get_all_fmri_files(self):
+        """
+        Returns a list of ALL fmri files that are in the dataset (resting and task-based)
+        """
+        if self.setup.args.select_sessions_list == '':
+            print("Finding all FMRIs...")
+            find_cmd = "find {} -mindepth 3 -maxdepth 4 \( -type f -o -type l \) -name '*task-*_bold.nii.gz' | grep -v derivatives".format(str(self.setup.root_dataset_path))
+            result = subprocess.run(find_cmd, shell=True, capture_output=True, text=True).stdout
+            files = result.strip().splitlines()
+        else:
+            lst_path = Path(self.setup.args.select_sessions_list)
+            assert lst_path.exists(), "Error: select_sessions_list file {} that was specified does not exist".format(str(lst_path))
+            print("Finding all resting state FMRIs from select_sessions_list {}...".format(str(lst_path)))
+            with open(lst_path, 'r') as f:
+                files = f.readlines()
+            files = [x.strip() for x in files]
+        return files
+
     def get_BIDS_fields_dwi(self, dwi_path):
         """
         Return the BIDS tags for a dwi scan
@@ -816,6 +845,15 @@ class ScriptGenerator:
         matches = re.findall(pattern, str(rs_fmri_path).split('/')[-1])
         sub, ses, acq, run = matches[0][0], matches[0][1], matches[0][2], matches[0][3]
         return sub, ses, acq, run
+
+    def get_BIDS_fields_fmri(self, fmri_path):
+        """
+        Gets the BIDS fields for fMRI scans (sub,ses,task,acq,run)
+        """
+        pattern = r'(sub-\w+)(?:_(ses-\w+))_(task-\w+)?(?:_(acq-\w+))?(?:_(run-\d{1,3}))?_bold'
+        matches = re.findall(pattern, str(fmri_path).split('/')[-1])
+        sub, ses, task, acq, run = matches[0][0], matches[0][1], matches[0][2], matches[0][3], matches[0][4]
+        return sub, ses, task, acq, run
 
     def check_PQ_outputs(self, pqdir):
         """
@@ -1014,6 +1052,20 @@ class ScriptGenerator:
         if not remeaned_file.exists():
             return False
         return True
+
+    def has_fmriprep_outputs(self, fmriprep_dir, sub, sesx, task, acqx, runx):
+        """
+        Returns true if the fmriprep outputs exist
+        """
+
+        result_html = fmriprep_dir/f"{sub}.html"
+        preproc =fmriprep_dir/sub/sesx/'func'/f"{sub}{sesx}_{task}{acqx}{runx}_space-MNI152NLin2009cAsy_desc-preproc_bold.nii.gz"
+
+        if not result_html.exists() or not preproc.exists():
+            #print("fmriprep outputs do not exist for {}{}{}{}".format(sub, sesx, task, acqx))
+            return False
+        return True
+
 
     def get_t1(self, path, sub, ses):
         #given a path to the anat folder, returns a T1 if it exists
@@ -1338,11 +1390,11 @@ class ScriptGenerator:
         acq, run = self.get_BIDS_acq_run_from_EVE3dir(pqdir)
         return sub, ses, acq, run
 
-    def add_to_missing(self, sub, ses, acq, run, reason):
+    def add_to_missing(self, sub, ses, acq, run, reason, task=None):
         """
         Adds a row to the missing data dataframe
         """
-        row = {'sub': sub, 'ses': ses, 'acq': acq, 'run': run, 'missing': reason}
+        row = {'sub': sub, 'ses': ses, 'acq': acq, 'run': run, 'missing': reason} if task is None else {'sub': sub, 'ses': ses, 'task': task, 'acq': acq, 'run': run, 'missing': reason}
         self.missing_data = pd.concat([self.missing_data, pd.Series(row).to_frame().T], ignore_index=True)
 
     def make_session_dirs(self, *args, **kwargs):
@@ -1357,14 +1409,14 @@ class ScriptGenerator:
         """
 
         sub, ses, acq, run = args
-        tmp_input_dir = kwargs['tmp_input_dir']/(sub)/("{}{}{}".format(ses,acq,run))
-        tmp_output_dir = kwargs['tmp_output_dir']/(sub)/("{}{}{}".format(ses,acq,run))
+        tmp_input_dir = kwargs['tmp_input_dir']/(sub)/("{}{}{}".format(ses,acq,run)) if 'task' not in kwargs else kwargs['tmp_input_dir']/(sub)/("{}{}{}{}".format(ses,kwargs['task'],acq,run))
+        tmp_output_dir = kwargs['tmp_output_dir']/(sub)/("{}{}{}".format(ses,acq,run)) if 'task' not in kwargs else kwargs['tmp_output_dir']/(sub)/("{}{}{}{}".format(ses,kwargs['task'],acq,run))
         tmp_dirs = [tmp_input_dir, tmp_output_dir]
         if 'has_working' in kwargs.keys() and kwargs['has_working']:
-            working_dir = kwargs['working_dir']/(sub)/("{}{}{}".format(ses,acq,run))
+            working_dir = kwargs['working_dir']/(sub)/("{}{}{}".format(ses,acq,run)) if 'task' not in kwargs else kwargs['working_dir']/(sub)/("{}{}{}{}".format(ses,kwargs['task'],acq,run))
             tmp_dirs.append(working_dir)
         if 'has_temp' in kwargs.keys() and kwargs['has_temp']:
-            temp_dir = kwargs['temp_dir']/(sub)/("{}{}{}".format(ses,acq,run))
+            temp_dir = kwargs['temp_dir']/(sub)/("{}{}{}".format(ses,acq,run)) if 'task' not in kwargs else kwargs['temp_dir']/(sub)/("{}{}{}{}".format(ses,kwargs['task'],acq,run))
             tmp_dirs.append(temp_dir)
         if 'ticv' in kwargs.keys() and kwargs['ticv']:
             post = tmp_output_dir/"post"
@@ -1522,6 +1574,10 @@ class ScriptGenerator:
                 script.write("echo Creating additional input directories...\n")
                 for inp_dir in kwargs['input_dirs']:
                     script.write('mkdir -p {}/{}\n'.format(session_input, inp_dir))
+            if 'output_dirs' in kwargs: #only for fmriprep
+                script.write("echo Creating additional output directories...\n")
+                for out_dir in kwargs['output_dirs']:
+                    script.write('mkdir -p {}/{}\n'.format(session_output, out_dir))
             # if 'tractseg_setup' in kwargs:
             #     script.write("MINWAIT=0\n")
             #     script.write("MAXWAIT=60\n")
@@ -4381,7 +4437,7 @@ class SeeleyFMRIPreprocv51Generator(ScriptGenerator):
         self.outputs = {}
         self.inputs_dict = {}
 
-        self.seeleyFMRIPreprocv51_script_generate()
+        self.generate_seeleyFMRIPreprocv51_scripts()
 
     def seeley_fmri_preproc_v51_script_generate(self, script, session_input, session_output, **kwargs):
         
@@ -4389,7 +4445,10 @@ class SeeleyFMRIPreprocv51Generator(ScriptGenerator):
         script.write(f"singularity run -e --contain -B {session_input}:/dev/shm -B /tmp:/tmp --home {session_input} -B {session_input}/{kwargs['seeley_fmri']}:/INPUTS/{kwargs['seeley_fmri']} -B {session_input}/{kwargs['seeley_t1']}:/INPUTS/{kwargs['seeley_t1']} -B {session_input}/{kwargs['seeley_t2']}:/INPUTS/{kwargs['seeley_t2']} -B {session_input}/{kwargs['seeley_seg']}:/INPUTS/{kwargs['seeley_seg']} -B {session_output}:/OUTPUTS {self.setup.simg} --proj {kwargs['seeley_proj']} --subj {kwargs['seeley_subj']} --sess {kwargs['seeley_subj']} /INPUTS /OUTPUTS\n")
         script.write("echo Done running Seeley FMRI Preprocessing v5.1. Now removing inputs and copying outputs back...\n")
 
-    def seeleyFMRIPreprocv51_script_generate(self):
+    def generate_seeleyFMRIPreprocv51_scripts(self):
+        """
+        Generates Seeley rsFMRI Preprocessing v5.1 scripts for a dataset
+        """
 
         assert self.setup.args.dataset_name == 'BLSA', "Error: SeeleyFMRIPreprocv5.1 is only supported for BLSA dataset"
 
@@ -4464,6 +4523,144 @@ class SeeleyFMRIPreprocv51Generator(ScriptGenerator):
 
             #start the script generation
             self.start_script_generation(session_input, session_output, deriv_output_dir=seeley_target, seeley_t1=seeley_t1, seeley_t2=seeley_t2, seeley_fmri=seeley_fmri, seeley_seg=seeley_seg, seeley_subj=legacy, seeley_proj=proj)
+
+#FMRIPrep
+class FMRIprepGenerator(ScriptGenerator):
+
+    def __init__(self, setup_object):
+        """
+        Class for running fmriprep
+        """
+        super().__init__(setup_object=setup_object)
+        #self.warnings = {}
+        self.outputs = {}
+        self.inputs_dict = {}
+
+        self.generate_fmriprep_scripts()
+
+    def fmri_prep_script_generate(self, script, session_input, session_output, **kwargs):
+        """
+        writes a single script for running FMRIPrep
+        """
+
+        script.write("echo Creating dataset_description.json file...\n")
+        script.write("echo '{{\"Name\": \"BLSA\", \"BIDSVersion\": \"1.0.2\"}}' > {}/dataset_description.json\n".format(session_input))
+
+        script.write("echo Running FMRIPrep...\n")
+        extra_args = f"participant --participant-label {kwargs['sub']} --fs-license-file {self.setup.args.freesurfer_license_path} -w {kwargs['working_dir']} --derivatives {session_output} --nthreads 1 --clean-workdir --fs-no-resume --skip-bids-validation -vvv" # --fs-no-reconall
+        script.write(f"singularity run -e --contain -B /tmp:/tmp -B {session_input}:{session_input} -B {session_output}:{session_output} --home {kwargs['temp_dir']} -B {kwargs['working_dir']}:{kwargs['working_dir']} -B {self.setup.args.freesurfer_license_path}:{self.setup.args.freesurfer_license_path} {self.setup.simg} {session_input} {kwargs['prep_output']} {extra_args}\n")
+
+        script.write("echo Done running FMRIPrep. Now removing inputs and copying outputs back...\n")
+        script.write("rm -r {}/freesurfer\n".format(session_output))
+        script.write("rm -r {}/.* {}/*\n".format(kwargs['working_dir'], kwargs['working_dir']))
+        script.write("rm -r {}/.* {}/*\n".format(kwargs['temp_dir'], kwargs['temp_dir']))
+
+    def generate_fmriprep_scripts(self):
+        """
+        Generates fMRIprep scripts for a dataset
+        """
+
+        def UNest_asserts(root_temp, root_working):
+            #check to make sure that the temp and working directories exist and we can write to them
+            assert root_temp.exists(), "Error: Root temp directory {} does not exist".format(root_temp)
+            assert root_working.exists(), "Error: Root working directory {} does not exist".format(root_working)
+            assert os.access(root_temp, os.W_OK), "Error: Root temp directory {} is not writable".format(root_temp)
+            assert os.access(root_working, os.W_OK), "Error: Root working directory {} is not writable".format(root_working)
+
+        #assert that the working and temp directories exist
+        root_temp = Path(self.setup.args.temp_dir)
+        root_working = Path(self.setup.args.working_dir)
+        UNest_asserts(root_temp, root_working)
+
+        #get all the fmri files
+        fmris = self.get_all_fmri_files()
+
+        for fmri_p in tqdm(fmris):
+            
+            #get the BIDS tags for the fMRI file
+            sub, ses, task, acq, run = self.get_BIDS_fields_fmri(fmri_p)
+
+            #check to see if the fmriprep outputs already exist
+            sesx = '_'+ses if ses else ''
+            acqx = '_'+acq if acq else ''
+            runx = '_'+run if run else ''
+            prepdir = self.setup.dataset_derivs/(sub)/(ses)/f"FMRIPrep{task}{acqx}{runx}"
+            if self.has_fmriprep_outputs(prepdir, sub, sesx, task, acqx, runx):
+                continue
+            
+            #make sure that the JSON sidecar exists for the fMRI file
+            json_sidecar = Path(fmri_p.replace('.nii.gz', '.json'))
+            if not json_sidecar.exists():
+                self.add_to_missing(sub, ses, acq, run, 'json_sidecar_missing', task=task)
+                continue
+
+            #check to see if a T1 exists
+            fmri_dir = Path(fmri_p).parent
+            t1 = self.get_t1(fmri_dir.parent/("anat"), sub, ses)
+            if not t1:
+                self.add_to_missing(sub, ses, acq, run, 'T1_missing', task=task)
+                continue
+        
+            #check to see if the freesurfer outputs exist
+            _,_,anat_acq,anat_run = self.get_BIDS_fields_t1(t1)
+            #check to see if we are using infant freesurfer or not
+            if self.setup.args.use_infant_fs:
+                print("Warning: infant freesurfer outputs not tested for compatibility with fmriprep. Pipeline may not work. Please ensure that you require infant freesurfer outputs for your data.")
+                fs_dir = self.setup.dataset_derivs/(sub)/(ses)/("infantFS{}{}".format(anat_acq, anat_run))
+                if not self.has_infantFS_outputs(fs_dir):
+                    self.add_to_missing(sub, ses, acq, run, 'infant_freesurfer', task=task)
+                    continue
+            else:
+                fs_dir = self.setup.dataset_derivs/(sub)/(ses)/("freesurfer{}{}".format(anat_acq, anat_run))
+                if not check_freesurfer_outputs(fs_dir):
+                    self.add_to_missing(sub, ses, acq, run, 'freesurfer', task=task)
+                    continue
+            
+            #now we should be able to generate the script
+            self.count += 1
+
+            #create the temporary directories
+            session_temp = root_temp#/(sub)/("{}{}{}{}".format(ses,task,acq,run))
+            session_work = root_working#/(sub)/("{}{}{}{}".format(ses,task,acq,run))
+            (session_input, session_output, session_work, session_temp) = self.make_session_dirs(sub, ses, acq, run, tmp_input_dir=self.setup.tmp_input_dir,
+                                            tmp_output_dir=self.setup.tmp_output_dir, temp_dir=session_temp, working_dir=session_work,
+                                            has_working=True, has_temp=True, task=task)
+
+            #create the output target directory
+            prep_target = self.setup.output_dir/(sub)/(ses)/("FMRIPrep{}{}{}".format(task, acq, run))
+            if not prep_target.exists():
+                os.makedirs(prep_target)
+
+            #need to create a pseudo BIDS directory structure in the outputs for fmriprep
+                #make the pseudo BIDS directory in the temp outputs, then delete all teh freesurfer and temp inputs and copy back only the fmri outputs
+                #inside the script you can always copy files to the appropriate directories as well
+                #create a dataset_description.json file wherever the inputs end up being
+
+            root_ses = session_input/sub/ses
+            anat_ses = root_ses/'anat'
+            anat_ses_suff = str(anat_ses).split(str(session_input))[1][1:]
+            fmri_ses = root_ses/'func'
+            fmri_ses_suff = str(fmri_ses).split(str(session_input))[1][1:]
+            output_prep_ses = session_output/'fmriprep'
+            output_freesurfer_suff = Path('freesurfer')/sub/ses
+
+            #setup the inputs dictionary and outputs list
+            self.inputs_dict[self.count] = {
+                't1': {'src_path': t1, 'targ_name': anat_ses/t1.name},
+                'fmri': {'src_path': fmri_p, 'targ_name': fmri_ses/Path(fmri_p).name},
+                'fmri_json': {'src_path': json_sidecar, 'targ_name': fmri_ses/Path(json_sidecar).name},
+                'freesurfer': {'src_path': fs_dir/'freesurfer', 'targ_name': str(output_freesurfer_suff), 'directory':True, 'separate_input': session_output},
+            }
+            self.outputs[self.count] = []
+
+            #start the script generation
+            self.start_script_generation(session_input, session_output, deriv_output_dir=prep_target, prep_output=output_prep_ses, temp_dir=session_temp, working_dir=session_work,
+                                            sub=sub, input_dirs=[anat_ses_suff, fmri_ses_suff], output_dirs=[output_freesurfer_suff])
+
+            #self.start_script_generation(session_input, session_output, deriv_output_dir=unest_target, temp_dir=session_temp, working_dir=session_work)
+
+
+
 
 #for Kurt: run scilpy scipts on tractseg dirs
 class Scilpy_on_TractsegGenerator(ScriptGenerator):
