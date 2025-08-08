@@ -1316,7 +1316,7 @@ class ScriptGenerator:
         #get the acquisition and run name from the T1
         sub, ses, acq, run = self.get_BIDS_fields_t1(t1)
         #now get the associated TICV file
-        ss_dir = ses_deriv/("T1_synthstrip{}{}".format(acq,run))/("post")/("FinalResult")
+        ss_dir = ses_deriv/("T1_synthstrip{}{}".format(acq,run))
         if not acq == '':
             acq = '_'+acq
         if not run == '':
@@ -1812,6 +1812,8 @@ class PreQualGenerator(ScriptGenerator):
 
         if self.setup.args.skull_stripped and kwargs['needs_synb0']:
             opts += ' --synb0 stripped'
+        elif self.setup.args.use_synthstrip and kwargs['needs_synb0']:
+            opts += ' --synb0 synthstrip'
 
         #write the dtiQA_config.csv file (iterate over the rows of the config dataframe)
         #config_f = self.setup.tmp_input_dir/('dtiQA_config.csv')
