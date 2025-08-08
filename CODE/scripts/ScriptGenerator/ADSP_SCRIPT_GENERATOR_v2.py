@@ -1813,7 +1813,7 @@ class PreQualGenerator(ScriptGenerator):
         if self.setup.args.skull_stripped and kwargs['needs_synb0']:
             opts += ' --synb0 stripped'
         elif self.setup.args.use_synthstrip and kwargs['needs_synb0']:
-            opts += ' --synb0 synthstrip'
+            opts += ' --synb0 stripped'
 
         #write the dtiQA_config.csv file (iterate over the rows of the config dataframe)
         #config_f = self.setup.tmp_input_dir/('dtiQA_config.csv')
@@ -2014,7 +2014,7 @@ class PreQualGenerator(ScriptGenerator):
                     #setup the inputs dicitonary
                     if self.setup.args.skull_stripped or self.setup.args.use_synthstrip:
                         self.inputs_dict[self.count] = {'dwi': need_dwis[dir_num], 'bval': need_bvals[dir_num],
-                                                    'bvec': need_bvecs[dir_num], 't1': {'src_path':t1, 'targ_name': 't1.nii.gz'},
+                                                    'bvec': need_bvecs[dir_num], 't1': {'src_path':t1 if self.setup.args.skull_stripped else seg, 'targ_name': 't1.nii.gz'},
                                                     'seg': {'src_path':seg, 'targ_name': 'seg.nii.gz'}}
                         self.warnings[self.count] += "Running synb0 with skull-stripped T1\n"
                     else:
