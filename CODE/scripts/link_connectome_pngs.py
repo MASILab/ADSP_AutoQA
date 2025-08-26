@@ -19,7 +19,7 @@ res = subprocess.run(cmd, shell=True, capture_output=True, text=True).stdout.str
 for r in tqdm(res):
     #get the subject name (and see if there is a session name)
     png_path = Path(r)
-    if png_path.parent.parent.parent == 'derivatives':
+    if png_path.parent.parent.parent.name == 'derivatives':
         subj = png_path.parent.parent.name
         ses = ''
     else:
