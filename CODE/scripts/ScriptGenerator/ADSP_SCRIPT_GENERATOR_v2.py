@@ -2162,7 +2162,8 @@ class FreeSurferGenerator(ScriptGenerator):
 
             #check to see if the freesurfer outputs exist
             fs_dir = self.setup.dataset_derivs/ sub / ses / 'freesurfer{}{}'.format(acq, run)
-            if check_freesurfer_outputs(fs_dir):
+            fs_check, fs_status = check_freesurfer_outputs(fs_dir)
+            if fs_check or fs_status == "freesurfer_missing" or fs_status == "freesurfer_log_missing":
                 continue
 
             self.count += 1
@@ -4163,8 +4164,9 @@ class FreesurferWhiteMatterMaskGenerator(ScriptGenerator):
                     continue
             else:
                 fs_dir = self.setup.dataset_derivs/(sub)/(ses)/("freesurfer{}{}".format(anat_acq, anat_run))
-                if not check_freesurfer_outputs(fs_dir):
-                    self.add_to_missing(sub, ses, acq, run, 'freesurfer')
+                fs_check, fs_status = self.check_freesurfer_outputs(fs_dir)
+                if not fs_check:
+                    self.add_to_missing(sub, ses, acq, run, fs_status)
                     continue
 
             #now that we have all the necessary inputs, we can start the script generation TODO
@@ -4614,8 +4616,9 @@ class FMRIprepGenerator(ScriptGenerator):
                     continue
             else:
                 fs_dir = self.setup.dataset_derivs/(sub)/(ses)/("freesurfer{}{}".format(anat_acq, anat_run))
-                if not check_freesurfer_outputs(fs_dir):
-                    self.add_to_missing(sub, ses, acq, run, 'freesurfer', task=task)
+                fs_check, fs_status = self.check_freesurfer_outputs(fs_dir)
+                if not fs_check:
+                    self.add_to_missing(sub, ses, acq, run, fs_status, task=task)
                     continue
             
             #now we should be able to generate the script
@@ -4930,15 +4933,17 @@ def check_freesurfer_outputs(fs_dir):
             try:
                 content = log.read()
                 if 'finished without error' in content:
-                    return True
+                    return True, "freesurfer_completed"
+                if 'freesurfer exited with ERRORS':
+                    return False, "freesurfer_failed"
                     #isDone = True
             #if isDone:
             #    continue
             except:
                 print("Error: Could not read contents of recon-all.log for {}".format(fs_dir))
-                return False
+                return False, "freesurfer_log_missing"
     print("Error: Freesurfer outputs are not valid for {}".format(fs_dir))
-    return False
+    return False, "freesurfer_missing"
 
 def hash_file(filepath):
     """
