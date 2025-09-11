@@ -82,6 +82,8 @@ def pa():
     p.add_argument('--set_neg_age_to_zero', action='store_true', help="If you want to set the negative ages to zero for the infantFS pipeline")
     p.add_argument('--use_synthstrip', action='store_true', help="If you want to use SynthStrip for PreQual instead of UNest/TICV")
     p.add_argument("--scp_max_wait_time", type=int, default=600, help="Maximum time to add for scp/ssh commands so that servers are not over-throttled.")
+    p.add_argument("--min_shell_threshold", type=int, default=500, help="Minimum threshold for b-value shells to include in DTI data (default: 500); currently only for pasternak freewater pipeline")
+    p.add_argument("--max_shell_threshold", type=int, default=1500, help="Maximum threshold for b-value shells in DTI data (default: 1500); currently only for pasternak freewater pipeline")
     return p.parse_args()
 
 class ScriptGeneratorSetup:
@@ -240,7 +242,7 @@ class ScriptGeneratorSetup:
         """
         freesurfer_simg = '/nobackup/p_masi/Singularities/freesurfer_7.2.0.sif'
         ticv_simg = '/nobackup/p_masi/Singularities/nssSLANT_v1.2.simg'
-        wmatlas_simg = '/nobackup/p_masi/Singularities/WMAtlas_v1.3.simg'
+        wmatlas_simg = '/nobackup/p_masi/Singularities/WMAtlas_v1.4.simg'
         scilpy_simg = '/nobackup/p_masi/Singularities/scilus_1.5.0.sif'
         tractseg_simg = '/nobackup/p_masi/Singularities/tractsegv2.simg'
         try:
@@ -256,7 +258,7 @@ class ScriptGeneratorSetup:
                         'ConnectomeSpecial': '/nobackup/p_masi/Singularities/ConnectomeSpecial_v1.3.sif',
                         'Biscuit': '/nobackup/p_masi/Singularities/biscuit_FC_v2.2.sif',
                         'NODDI': '/nobackup/p_masi/Singularities/tractoflow_2.2.1_b9a527_2021-04-13.sif',
-                        'freewater': '/nobackup/p_masi/Singularities/FreeWaterEliminationv2.sif',
+                        'freewater': '/nobackup/p_masi/Singularities/FreeWaterEliminationv3.sif',
                         'synthstrip': '/nobackup/p_masi/Singularities/synthstrip.1.5.sif',
                         'DWI_plus_Tractseg': [tractseg_simg, scilpy_simg, wmatlas_simg],
                         'BedpostX_plus_Tractseg': [tractseg_simg, scilpy_simg, wmatlas_simg],
@@ -1309,10 +1311,21 @@ class ScriptGenerator:
         unest_seg = unest_dir/("{}{}{}{}_T1w_seg_merged_braincolor.nii.gz".format(sub,ses,acq,run))
         return unest_seg
 
-    def get_synthstrip_file(self, t1, ses_deriv):
+    def get_synthstrip_file(self, t1, ses_deriv, mask=False):
         """
         Returns the T1 synthstrip file associated with the T1 file. Returns None if the file does not exist.
         """
+        #check to see if the t1 IS a synthstrip file
+        if Path(str(t1)).name.endswith('synthstrip_T1w.nii.gz'):
+            if not mask:
+                if t1.exists():
+                    return t1
+            else:
+                mask_name = Path(str(t1)).name.replace('_synthstrip_T1w.nii.gz', '_synthstrip_T1w_mask.nii.gz')
+                mask_file = Path(str(t1)).parent / mask_name
+                if mask_file.exists():
+                    return mask_file
+            return None
         #get the acquisition and run name from the T1
         sub, ses, acq, run = self.get_BIDS_fields_t1(t1)
         #now get the associated TICV file
@@ -1323,7 +1336,10 @@ class ScriptGenerator:
             run = '_'+run
         if not ses == '':
             ses = '_'+ses
-        ss_file = ss_dir/("{}{}{}{}_synthstrip_T1w.nii.gz".format(sub,ses,acq,run))
+        if mask:
+            ss_file = ss_dir/("{}{}{}{}_synthstrip_T1w_mask.nii.gz".format(sub,ses,acq,run))
+        else:
+            ss_file = ss_dir/("{}{}{}{}_synthstrip_T1w.nii.gz".format(sub,ses,acq,run))
         #TICV_seg = TICV_dir/("{}{}{}{}_T1w_seg.nii.gz".format(sub,ses,acq,run))
         #print(TICV_seg)
         if not ss_file.exists():
@@ -2542,7 +2558,11 @@ class EVE3WMAtlasGenerator(ScriptGenerator):
             
             #based on the T1, get the TICV/UNest segmentation (if applicable)
             if self.setup.args.no_t1seg:
-                seg = None
+                #get the synthstrip brain mask instead
+                seg = self.get_synthstrip_file(t1, pqdir.parent, mask=True)
+                if seg == None:
+                    self.add_to_missing(sub, ses, acq, run, 'Synthstrip_mask')
+                    continue
             else:
                 ses_deriv = pqdir.parent
                 if not self.setup.args.use_unest_seg:
@@ -2570,6 +2590,8 @@ class EVE3WMAtlasGenerator(ScriptGenerator):
                                         }
             if not self.setup.args.no_t1seg:
                 self.inputs_dict[self.count]['seg'] = {'src_path': seg, 'targ_name': 'T1_seg.nii.gz'}
+            else: #if synthstrip is being used instead
+                self.inputs_dict[self.count]['mask'] = {'src_path': seg, 'targ_name': 'T1_mask.nii.gz'}
                 #'seg': {'src_path': seg, 'targ_name': 'T1_seg.nii.gz'},
             self.outputs[self.count] = []
 
@@ -3458,8 +3480,10 @@ class FreewaterGenerator(ScriptGenerator):
         Method for writing the commands for running freewater to a script
         """
         
+        #min_shell_threshold
+        extra_args = "--low {} --high {}".format(kwargs['min_shell_thresh'], kwargs['max_shell_thresh'])
         script.write("echo Running FreeWater...\n")
-        script.write("singularity run -e --contain -B {}:/input -B {}:/output --home {} -B /tmp:/tmp -B {}:/dev/shm {} dwmri.nii.gz dwmri.bval dwmri.bvec mask.nii.gz\n".format(session_input, session_output, session_input, session_input, self.setup.simg))
+        script.write("singularity run -e --contain -B {}:/input -B {}:/output --home {} -B /tmp:/tmp -B {}:/dev/shm {} dwmri.nii.gz dwmri.bval dwmri.bvec mask.nii.gz {}\n".format(session_input, session_output, session_input, session_input, self.setup.simg, extra_args))
         #singularity run -B inputs/:/input -B outputs/:/output ../FreeWaterEliminationv2.sif dwmri.nii.gz dwmri.bval dwmri.bvec mask.nii.gz
 
     def generate_freewater_scripts(self):
@@ -3469,6 +3493,12 @@ class FreewaterGenerator(ScriptGenerator):
 
         #first, get the PreQual directories
         prequal_dirs = self.get_PreQual_dirs()
+
+        #check the min and max shell thresholds
+        min_shell_thresh = self.setup.args.min_shell_threshold
+        max_shell_thresh = self.setup.args.max_shell_threshold
+        assert min_shell_thresh >= 0, "Error: Minimum shell threshold must be non-negative"
+        assert max_shell_thresh >= min_shell_thresh, "Error: Maximum shell threshold must be greater than or equal to minimum shell threshold"
 
         for pqdir_p in tqdm(prequal_dirs):
             pqdir = Path(pqdir_p)
@@ -3504,7 +3534,7 @@ class FreewaterGenerator(ScriptGenerator):
             self.outputs[self.count] = []
 
             #start the script generation
-            self.start_script_generation(session_input, session_output, deriv_output_dir=fw_target)
+            self.start_script_generation(session_input, session_output, deriv_output_dir=fw_target, min_shell_thresh=min_shell_thresh, max_shell_thresh=max_shell_thresh)
 
 class BRAIDGenerator(ScriptGenerator):
     """
