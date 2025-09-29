@@ -5066,7 +5066,8 @@ def get_PE_dirs(json_dicts, jsons, single=False):
         ##TODO: Incorporate the new VMAP acquisitions to determine the sign (as it is not in the JSONS for some reason)
         if 'ReversePE' in json_file.name:
             PEsign = '-'
-            PEaxis = PEdir
+            #PEaxis = PEdir
+            PEaxis = PEdir[0] if PEdir[1] == '-' else PEdir[1]
         else:
             if len(PEdir) == 2:
                 if PEdir[0] == '-' or PEdir[1] == '-':
