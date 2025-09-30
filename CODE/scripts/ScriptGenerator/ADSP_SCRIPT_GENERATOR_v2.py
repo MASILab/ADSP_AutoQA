@@ -67,7 +67,7 @@ def pa():
     p.add_argument('--force_combine_prequal', action='store_true', help="If you want to forcibly run all the dwis in a session together for a dataset")
     p.add_argument('--custom_home', default='', type=str, help="Path to the custom home directory for the user if --no_accre is set (for Tractseg)")
     p.add_argument('--TE_tolerance_PQ', default=0.01, type=float, help="Tolerance for TE differences in determining scan similarity for PreQual")
-    p.add_argument('--TR_tolerance_PQ', default=0.01, type=float, help="Tolerance for TR differences in determining scan similarity for PreQual")
+    p.add_argument('--TR_tolerance_PQ', default=1, type=float, help="Tolerance for TR differences in determining scan similarity for PreQual")
     p.add_argument('--accre_gpu', action='store_true', help="If you want to run the pipeline on ACCRE with a GPU (note, you may need to specify simgs with a CUDA installation)")
     p.add_argument('--tractseg_make_DTI', action='store_true', help="If you want to make the DTI files for Tractseg")
     p.add_argument('--tractseg_DTI_use_all_shells', action='store_true', help="If you want to forego the shelling for calculating DTI measures")
