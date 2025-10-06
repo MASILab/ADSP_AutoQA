@@ -1910,6 +1910,16 @@ class PreQualGenerator(ScriptGenerator):
             dwis = list(dwi_dir.glob('*dwi.nii.gz'))
             bvals = [Path(str(x).replace('.nii.gz', '.bval')) for x in dwis]
             bvecs = [Path(str(x).replace('.nii.gz', '.bvec')) for x in dwis]
+            #see if any of the bvals/bvecs do not exist
+            dwis_exist = [dwis[i] for i in range(len(dwis)) if bvals[i].exists() and bvecs[i].exists()]
+            if len(dwis_exist) != len(dwis):
+                #see which bvals/bvecs do not exist
+                for i in range(len(dwis)):
+                    if not bvals[i].exists() or not bvecs[i].exists():
+                        print("Warning: Missing bval/bvec for {}. Skipping this DWI.".format(dwis[i]))
+                dwis = dwis_exist
+                bvals = [Path(str(x).replace('.nii.gz', '.bval')) for x in dwis]
+                bvecs = [Path(str(x).replace('.nii.gz', '.bvec')) for x in dwis]
             assert len(dwis) == len(bvals) == len(bvecs), "Error: number of dwis, bvals, and bvecs do not match for {}_{}".format(sub, ses)
             jsons = [Path(str(x).replace('.nii.gz', '.json')) for x in dwis]
 
