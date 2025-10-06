@@ -1920,6 +1920,9 @@ class PreQualGenerator(ScriptGenerator):
                 dwis = dwis_exist
                 bvals = [Path(str(x).replace('.nii.gz', '.bval')) for x in dwis]
                 bvecs = [Path(str(x).replace('.nii.gz', '.bvec')) for x in dwis]
+                if len(dwis) == 0:
+                    print("Warning: No valid DWI scans with bvals/bvecs found in {}_{}. Skipping session.".format(sub, ses))
+                    continue
             assert len(dwis) == len(bvals) == len(bvecs), "Error: number of dwis, bvals, and bvecs do not match for {}_{}".format(sub, ses)
             jsons = [Path(str(x).replace('.nii.gz', '.json')) for x in dwis]
 
