@@ -2868,7 +2868,7 @@ class BiscuitGenerator(ScriptGenerator):
             #create the temporary directories
             session_temp = root_temp/(sub)/("{}{}{}".format(ses,acq,run))
             session_work = root_working/(sub)/("{}{}{}".format(ses,acq,run))
-            (session_input, session_output) = self.make_session_dirs(sub, ses, acq, run, tmp_input_dir=self.setup.tmp_input_dir,
+            (session_input, session_output, session_work, session_temp) = self.make_session_dirs(sub, ses, acq, run, tmp_input_dir=self.setup.tmp_input_dir,
                                             tmp_output_dir=self.setup.tmp_output_dir, temp_dir=session_temp, working_dir=session_work,
                                             has_working=True, has_temp=True)
 
@@ -2886,7 +2886,7 @@ class BiscuitGenerator(ScriptGenerator):
 
             #start the script generation
             self.start_script_generation(session_input, session_output, deriv_output_dir=biscuit_target,
-                                         temp_dir=session_temp, working_dir=session_work, sub=sub, ses=ses)
+                                         session_temp=session_temp, session_working=session_work, sub=sub, ses=ses)
 
 class ConnectomeSpecialGenerator(ScriptGenerator):
     """
