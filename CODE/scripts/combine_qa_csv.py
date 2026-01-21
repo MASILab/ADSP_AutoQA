@@ -14,7 +14,8 @@ DTI_PROC = [
     'Tractseg*',
     'NODDI',
     'WMAtlas',
-    'freewater'
+    'freewater',
+    "BRAID"
 ]
 DTI_PROC += [
     "TractsegAFleft", "TractsegAFright", "TractsegATRleft", "TractsegATRright",
@@ -54,6 +55,7 @@ def pa():
     parser.add_argument('root_qa_dir', type=str, help='Path to the root qa directory')
     parser.add_argument('--process', default='dti', type=str, choices=['dti', 't1'], help='Process type to combine')
     parser.add_argument('--test', action='store_true', help='Print the commands instead of running them')
+    parser.add_argument('--out_csv', type=str, default='', help='Print verbose output')
     return parser.parse_args()
 
 def reorder_columns(df):
@@ -130,7 +132,10 @@ if args.test:
     print(merged_df.columns) 
     print(merged_df)
 else:
-    output_df = dataset_qa_dir / '{}_QA_total.csv'.format(args.process.upper())
+    if args.out_csv != '':
+        output_df = Path(args.out_csv)
+    else:
+        output_df = dataset_qa_dir / '{}_QA_total.csv'.format(args.process.upper())
     merged_df.to_csv(output_df, index=False)
     set_file_permissions(output_df)
     #merged_df.to_csv(dataset_qa_dir / 'QA.csv', index=False)
