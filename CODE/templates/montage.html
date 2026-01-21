@@ -515,7 +515,7 @@
             // Instead, we use positional capture groups and then access them by index.
             //var pattern = /(sub-\w+)(?:_(ses-\w+))?(?:_(\w+))(?:(acq-\w+))?(?:(run-\d{1,2}))?.png/;
             //var pattern = /(sub-\w+)(?:_(ses-\w+))?_([A-Za-z0-9\.]*)(?:(acq-\w+))?(?:(run-\d{1,2}))?\.png/;
-            var pattern = /(sub-\w+)(?:_(ses-\w+))?_([A-Za-z0-9\.\-]+?)(?=acq\-|run\-|\.png)(?:(acq-\w+))?(?:(run-\d{1,2}))?\.png/;
+            var pattern = /(sub-\w+)(?:_(ses-\w+))?_([A-Za-z0-9\.\-]+?)(?=acq\-|run\-|\.png)(?:(acq-\w+))?(?:(run-\d{1,4}))?\.png/;
             var match = filename.match(pattern);
 
             // Assert that a match is found

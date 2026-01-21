@@ -48,7 +48,7 @@ def get_BIDS_fields_from_png(filename, return_pipeline=False):
     """
     #pattern = r"sub-(?P<sub>\d+)_ses-(?P<ses>\d+)_\w+acq-(?P<acq>\d+)run-(?P<run>\d+)\.png"
     #pattern = r'(sub-\w+)(?:_(ses-\w+))?_([A-Za-z0-9\.]*)(?:(acq-\w+))?(?:(run-\d{1,2}))?\.png'
-    pattern = r'(sub-\w+)(?:_(ses-\w+))?_([A-Za-z0-9\.\-]+?)(?=acq\-|run\-|\.png)(?:(acq-\w+))?(?:(run-\d{1,2}))?\.png'
+    pattern = r'(sub-\w+)(?:_(ses-\w+))?_([A-Za-z0-9\.\-]+?)(?=acq\-|run\-|\.png)(?:(acq-\w+))?(?:(run-\d{1,4}))?\.png'
     match = re.match(pattern, filename)
     #print("Match:", match)
     assert match, f"Filename {filename} does not match the expected pattern."
